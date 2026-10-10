@@ -1,32 +1,38 @@
 # Bill Brawl
 
-An original browser arena shooter starring platypuses, ducks, pelicans, toucans, puffins, and shoebills. Species are cosmetic and share one movement model and body hitbox.
+An original browser arena shooter starring platypuses, ducks, pelicans, toucans, puffins, and shoebills. Species are cosmetic and share one movement model and body hitbox. Art, synthesized music, and sound effects are original; no Duck Game assets are used.
 
 ## Play locally
 
-Serve `dist` with any static HTTP server, for example:
+Serve `dist` with any static HTTP server:
 
 ```sh
 python -m http.server 8080 --directory dist
 ```
 
-Open `http://localhost:8080` in a desktop browser. Two players can share a keyboard or use controllers. Four-player mode uses the keyboard for players 1–2 and two controllers for players 3–4. Solo mode includes a simple practice opponent. Controls appear below the arena and in How to Play. Browser/mobile rendering is responsive; touch gameplay is not implemented.
+Open `http://localhost:8080` in a desktop browser. Two players share a keyboard or use controllers. Three/four-human survival uses keyboard players 1–2 and one/two controllers for players 3–4; four-player PvP uses the same mapping. Solo practice has easy, normal, and hard bot settings. Controls appear below the arena and in How to Play. Mobile rendering is responsive, but touch controls and internet multiplayer are not implemented.
 
-## Features
+## Modes and content
 
-- Three rotating handcrafted arenas and first-to-ten matches.
-- Pistol, shotgun, timed grenade; pickups, limited ammo, drops, throws.
-- Jump, flutter, crouch, facing lock, player calls, recoil.
-- One-hit elimination and simultaneous-death draws.
-- High tide after 25 seconds to end standoffs.
-- Six species, original Canvas pixel art, synthesized sound, pause, fullscreen.
+- Classic PvP: 2 or 4 players, one-hit eliminations, first to ten round wins, simultaneous-death draws. Seven handcrafted arenas rotate from the selected starting arena; tide or lava rises after 25 seconds.
+- Bot practice: a navigating opponent that seeks usable pickups, jumps and drops between platforms, tracks the human, manages ammunition, fires with line of sight, and dodges incoming shots at normal/hard difficulty.
+- Zombie survival: 1–4 local players, endless waves with increasing enemy health, damage, spawn pace, and wave size. Runners appear at wave 3 and brutes at wave 5. Alive enemies are capped at 48 for frame stability; total waves have no cap. PvP arena gaps become a continuous survival floor.
+- Zombie health and ammo pickups, respawning equipment, kill rewards, 12-second upgrade breaks, escalating health/damage/speed purchase costs, and ammo refill between waves. Hold grab within 43 world pixels of a downed teammate for two seconds to revive them; bleed-out takes 18 seconds. Fallen teammates return at the next wave. Team wipe ends the run. Friendly fire is disabled; self explosions hurt.
+- Eleven weapons: pistol, shotgun, grenade, SMG, sniper, rocket launcher, bounce gun, flamethrower, railgun, crossbow, and Bill Hammer. Distinct firing behavior, sprites, ammunition, and sounds. Rail shots pierce enemies but stop at walls; bounce shots rebound up to three times.
+- Dockside, Rooftop Rumble, Pump Station, Sunken Temple, Neon Night Market, Frostbite Cove (slippery footing), and Ember Works (lava).
+- Higher-detail pixel sprites with recognizable species silhouettes, unique bills, player colours, weapon machining, and muzzle effects. A 1280×720 backing canvas renders the 640×360 simulation at 2× detail.
+- Original layered chiptune music for the lobby, seven arena themes, survival, and game over; distinct weapon effects and six species calls. Zombie music grows with wave intensity. Separate music/effects sliders, mute, automatic focus pause, fullscreen, controller Start pause and disconnect pause.
 
-This is a local multiplayer prototype. Internet multiplayer, map editing, replay recording, and progression are future work.
+Audio begins with a play or sound-button gesture, as required by browser autoplay rules. Gameplay continues if the browser blocks audio.
 
 ## Implementation and verification
 
-Buildless JavaScript modules with a Canvas renderer and a fixed 60 Hz game simulation. Bullet collisions use swept segments. Combat resolves deaths together before scoring a round. The engine is independent of the DOM.
+Buildless JavaScript modules with a Canvas renderer and a fixed 60 Hz game simulation. Swept bullet collision prevents tunnelling. Combat resolves simultaneous deaths before scoring. The engine is independent of the DOM. Graph navigation routes bots and zombies across platform geometry.
 
-`npm test` runs engine tests; `npm run check` checks JavaScript syntax. Browser verification covered lobby choices, starting matches, keyboard input, pause/resume, sound, help, four-player controller gating, practice mode, and narrow layouts. Physical gamepad hardware has not been tested.
+- `npm test`: 20 engine regression checks, including bot combat and zombie pursuit in all seven worlds, all eleven attacks, wall/piercing collisions, friendly fire, rewards, revival, bleed-out, team wipe, supplies, upgrades, and progression beyond wave 100.
+- `npm run check`: syntax checks for all six JavaScript modules.
+- `npm run test:browser`: Playwright integration checks using the environment-provided Chromium and Playwright. Tests cover galleries, keyboard movement/pickup/fire, bot activity, co-op survival, upgrades, audio graph signal for all eleven weapons, mute/pause/volume, virtual Gamepad mappings/disconnect, and desktop/mobile layouts. Physical controller hardware and subjective soundtrack listening have not been tested.
 
-The only external page resource is an optional Google Fonts stylesheet; system fonts provide a fallback. Game code, art, and sounds are self-contained.
+The read-only `getSnapshot()` module export supports diagnostics. `?qa=1` enables explicit local test hooks for late-wave UI checks; normal play does not enable those hooks. Browser test screenshots are ignored by Git.
+
+The only external page resource is an optional Google Fonts stylesheet; system fonts provide a fallback. Game code, art, and sounds are self-contained and require no runtime services.

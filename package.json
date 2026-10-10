@@ -1,1 +1,10 @@
-{"name":"bill-brawl","private":true,"type":"module","scripts":{"test":"node tests/engine.test.mjs","check":"node --check dist/engine.js && node --check dist/game.js"}}
+{
+  "name": "bill-brawl",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node tests/engine.test.mjs",
+    "check": "node --check dist/content.js && node --check dist/engine.js && node --check dist/audio.js && node --check dist/sprites.js && node --check dist/world.js && node --check dist/game.js",
+    "test:browser": "node tests/browser.mjs"
+  }
+}
