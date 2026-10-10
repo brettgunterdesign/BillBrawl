@@ -2,3 +2,7 @@
 *.tar.gz
 *.zip
 node_modules/
+artifacts/
+.jev-runtime/
+__pycache__/
+.env

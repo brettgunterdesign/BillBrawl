@@ -19,3 +19,7 @@ test('every door belongs to a furnished room with two entrances and an interior 
 test('nearby room loot takes priority over an open door for an unarmed player',()=>{
  const s=forest(),p=s.players[0];s.map.objects=[{type:'door',x:230,y:272,w:10,h:48,solid:true,open:true,hp:85}];p.x=200;s._terrainCache=null;s.items=[{x:200,y:311,w:16,h:9,lock:0,type:'pistol',ammo:12,vx:0,vy:0}];update(s,[{grab:true}]);assert.equal(p.weapon,'pistol');assert.equal(s.map.objects[0].open,true);
 });
+test('down+jump cannot drop through a solid support beside a one-way platform',()=>{
+ const s=forest(),p=s.players[0];s.map.objects=[];s.map.platforms=[{x:430,y:155,w:20,h:95,oneWay:false},{x:460,y:155,w:130,h:16,oneWay:true}];s._terrainCache=null;
+ Object.assign(p,{x:449.6,y:133,h:22,ground:true,vx:0,vy:0,previous:{}});predictPlayer(s,p,{down:true,jump:true});assert.ok(p.vy<0,'solid support should cause a jump instead of dropping into the pillar');assert.ok(p.y+p.h<155);
+});

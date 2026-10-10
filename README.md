@@ -58,3 +58,7 @@ Online Versus supports 2–4 guests, six-character room codes, host arena choice
 Run `npm ci --prefix server` and `npm run start:rooms`, then open `http://localhost:3001`. `npm run test:online` runs six real-WebSocket server integration checks and two prediction checks. `npm run test:online:browser` runs separate browser contexts through a ~120 ms round-trip delay relay and covers rooms, prediction, shared combat/cover/scores, reconnect/reload, rematches, four players, narrow layouts and graceful leave. `npm run check` covers the original modules, client networking and server syntax.
 
 See [server/HOSTING.md](server/HOSTING.md) and `render.yaml` for deployment. Use one always-on service instance initially; rooms live in RAM and end when it restarts. Bot practice and zombie survival remain local in this first online milestone. Actual hosting capacity and cross-region latency have not been measured.
+
+## Automated playthroughs and Jev
+
+`npm run playtest` plays seeded matches across all arenas, modes, practice difficulties and weapons; `npm run playtest:browser` tests real browser controls and saves screenshots/traces. `npm run setup:jev` installs the pinned JevHarness runtime; `npm run playtest:jev` lets Jev drive the browser player once a TypeSafe or Vercel key is configured. `npm run playtest:jev:mock` validates the integration offline and is explicitly not live AI testing. See [playtesting instructions, reports and findings](docs/playtesting.md).

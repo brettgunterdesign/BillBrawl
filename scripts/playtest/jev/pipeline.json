@@ -1,0 +1,41 @@
+{
+  "version": 2,
+  "name": "Bill Brawl gameplay exploration",
+  "jev_model": "typesafe-ai/jev",
+  "nodes": [
+    {
+      "id": "judgment",
+      "kind": "jev",
+      "state": "obs['features']",
+      "questions": {
+        "action": {
+          "type": "choice",
+          "instructions": "Choose the next short input action for a Bill Brawl playtester. Explore routes, collect and use weapons, interact with doors, try jumps and drop-through surfaces, and help downed teammates in cooperative survival. Avoid obvious lava, acid, and electric hazards unless testing a hazard boundary. Use only supplied present observations; do not invent hidden pickups or future behavior. Directional advance moves toward the supplied goal; retreat moves away. A drop is appropriate only on a one-way surface, not a solid pillar. Prefer interact beside a closed door or reachable equipment, or to revive a nearby teammate. Attack when an enemy is near the same height and ammunition is available. Release a charged plasma shot after holding attack. Vary actions when repeated movement makes no progress. Choose one listed action.",
+          "criteria": {
+            "advance": "Walk toward the visible goal without jumping; useful for closing distance or reaching a pickup.",
+            "jump_advance": "Jump and move toward the goal to reach a higher ledge, climb a tree branch, or clear cover.",
+            "crouch_advance": "Crouch and walk toward the goal to traverse a low passage.",
+            "drop": "Press down+jump to descend through a one-way platform or tree branch.",
+            "attack": "Aim toward the visible opponent and fire or charge the equipped weapon.",
+            "interact": "Open a nearby door, pick up or throw equipment, or hold grab to revive a nearby co-op teammate.",
+            "retreat": "Walk away from the goal to make room, avoid a nearby explosive, or prepare a running jump.",
+            "explore": "Walk an alternating route to investigate terrain when no useful target is visible.",
+            "release_charge": "Release fire to launch a charged plasma shot, or briefly release held controls."
+          }
+        },
+        "concern": {
+          "type": "choice",
+          "instructions": "Classify the strongest possible gameplay issue visible in this observation. A concern is a suggestion for review, not a confirmed failure. Do not call normal elimination, low ammo, a closed usable door, or an intentional hazard a bug. Prefer none when evidence is insufficient.",
+          "criteria": {
+            "none": "No clear suspicious gameplay behavior is visible.",
+            "blocked_route": "Repeated movement appears unable to leave a safe area despite attempted escape actions.",
+            "collision": "A living body visibly intersects a solid wall or has passed through a solid floor.",
+            "combat": "Weapon, ammo, or opponent behavior appears inconsistent with the supplied game rules.",
+            "framing": "A living or downed character appears outside the visible shared camera."
+          }
+        }
+      }
+    }
+  ],
+  "output": "{'action': nodes['judgment']['action']['choice'], 'concern': nodes['judgment']['concern']['choice']}"
+}

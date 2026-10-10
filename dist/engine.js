@@ -134,7 +134,7 @@ export function movePlayer(s,p,i,dt){
  const old=p.previous,h=i.down?14:22;if(h!==p.h){const next={...p,y:p.y+p.h-h,h};if(h<p.h||!collisionTerrain(s).some(b=>!b.oneWay&&overlap(next,b))){p.y=next.y;p.h=h;}}
  const move=Number(i.right)-Number(i.left);if(move&&!i.strafe)p.dir=move;const floor=footing(s,p),def=WEAPONS[p.weapon],slow=p.frozen>0?.25:1;const desired=move*(i.down?90:160)*p.speedScale*slow*(i.fire?(def?.moveScale||1):1),acc=p.ground?1700*floor.grip:850;p.vx+=clamp(desired-p.vx,-acc*dt,acc*dt);
  p.coyote=p.ground?.09:Math.max(0,p.coyote-dt);p.buffer=i.jump&&!old.jump?.1:Math.max(0,p.buffer-dt);let dropping=false;
- if(p.buffer>0&&p.coyote>0){if(i.down&&collisionTerrain(s).some(b=>b.oneWay&&Math.abs(p.y+p.h-b.y)<3&&p.x+p.w>b.x&&p.x<b.x+b.w)){p.y+=3;p.vy=70;dropping=true;}else{p.vy=-JUMP_SPEED;emit(s,'jump',{id:p.id});}p.buffer=0;p.coyote=0;p.ground=false;}
+ if(p.buffer>0&&p.coyote>0){if(i.down&&collisionTerrain(s).some(b=>b.oneWay&&Math.abs(p.y+p.h-b.y)<3&&p.x+p.w>b.x&&p.x<b.x+b.w)&&!collisionTerrain(s).some(b=>!b.oneWay&&Math.abs(p.y+p.h-b.y)<3&&p.x+p.w>b.x&&p.x<b.x+b.w)){p.y+=3;p.vy=70;dropping=true;}else{p.vy=-JUMP_SPEED;emit(s,'jump',{id:p.id});}p.buffer=0;p.coyote=0;p.ground=false;}
  if(!i.jump&&old.jump&&p.vy<-130)p.vy=-130;p.vy=Math.min(i.jump&&p.vy>0?115:480,p.vy+850*dt);moveBody(p,collisionTerrain(s),dt,dropping,s.map.width);if(p.ground&&floor.belt){const before=p.x;p.x=clamp(p.x+floor.belt*dt,0,s.map.width-p.w);if(collisionTerrain(s).some(b=>!b.oneWay&&overlap(p,b)))p.x=before;}
  p.previous={...i};
 }

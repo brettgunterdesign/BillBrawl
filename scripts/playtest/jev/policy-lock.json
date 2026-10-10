@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "upstream": "https://github.com/TianyuCodings/JevHarness",
+  "upstream_commit": "34d5c9602f6f73792e2c625cc31dd9ed7b4f39b5",
+  "pipeline_version": 2,
+  "validation": "offline wiring only; live Jev evaluation requires provider credentials",
+  "jev_required_for_live": true,
+  "reflection_enabled": false,
+  "files": {
+    "scripts/playtest/jev/pipeline.json": "01d7a0f4a3ddda920d6774b780160e1f8dc91b5f4f6d08377c88220cdee88028",
+    "scripts/playtest/jev/features.mjs": "79433a03acbdbba038129cc2db635bf10fe3b9a3baa6d30ddc4a43b469578460",
+    "scripts/playtest/jev/driver.mjs": "0aa8a2021df53fa4ed7d178c26007562a2b051f3ffd800ba8e797789d5167f33",
+    "scripts/playtest/jev/worker.py": "2860bb2bbe4b6dfa3d493d41855f19844553cbd00e35363a7846114500e8d7f8",
+    "scripts/playtest/checks.mjs": "8db2fc89e9f264c26add60f31ebdb7ff83252f5605059e0b6959567b8da5d81a",
+    "scripts/playtest/driver.mjs": "ad127415275241a9ece65f263ee8b7b0298f28375059167413a1070787742071",
+    "dist/engine.js": "76a8b14c5b8f8eb8abb180d3b76342e1519e2db1ad1efeb08183a93238c141c5",
+    "dist/content.js": "a1c321c199d3eec868b4583ddc83d167e82f66b5f7c33bd81f543603949f6fe2",
+    "dist/terrain.js": "99609b79c70207cfb0907590b1108c6502e46f8a2f7140b7f63db41bfbb53214"
+  }
+}
