@@ -2,12 +2,13 @@ import {drawBattleEffects} from './terrain-art.js';
 import {createState,update,MAPS,COLORS,WEAPONS,beginWave,buyUpgrade,upgradeCost} from './engine.js';
 import {AudioDirector} from './audio.js';
 import {ArcadeLobby} from './lobby.js';
+import {MenuController,ControllerKeyboard} from './menu-controller.js';
 import {OnlineArcade} from './online.js';
 import {SharedCamera} from './camera.js';
 import {drawCharacter,drawWeapon,drawWeaponIcon} from './sprites.js';
 import {drawBackground,drawArena,drawWater} from './world.js';
 const $=id=>document.getElementById(id),canvas=$('game'),ctx=canvas.getContext('2d'),audio=new AudioDirector(),camera=new SharedCamera();
-let state=createState(),started=false,paused=false,mode='duel',keys=new Set(),accumulator=0,last=0,sound=true,hudKey='',upgradeKey='',padStart=false,previousPads=0;
+let state=createState(),started=false,paused=false,mode='duel',keys=new Set(),accumulator=0,last=0,sound=true,hudKey='',upgradeKey='',previousPads=0;
 const roster=['platypus','duck','toucan','pelican'];
 const binds=[{left:'KeyA',right:'KeyD',jump:'KeyW',down:'KeyS',fire:'KeyF',grab:'KeyG',chirp:'KeyQ',strafe:'ShiftLeft'},{left:'ArrowLeft',right:'ArrowRight',jump:'ArrowUp',down:'ArrowDown',fire:'KeyK',grab:'KeyL',chirp:'KeyO',strafe:'Enter'}];
 const used=new Set([...Object.values(binds[0]),...Object.values(binds[1]),'Escape','Space']);
@@ -22,7 +23,8 @@ const online=new OnlineArcade({onOpen:()=>{localRoster.splice(0,localRoster.leng
  const entering=!started;state=next;roster.splice(0,roster.length,...species);mode='online';started=true;
  if(entering){paused=false;keys.clear();accumulator=0;hudKey='';$('menu').classList.add('hidden');$('pause').classList.add('hidden');$('help-panel').classList.add('hidden');for(const id of ['menu','pause','game-hud','online-menu'])$(id).inert=false;$('game-hud').classList.remove('hidden');$('inventory').classList.remove('hidden');$('online-connection').classList.remove('hidden');$('status').classList.remove('hidden');$('pause-button').disabled=false;previousPads=pads().length;canvas.focus();audio.setPaused(false);audio.unlock();scene();}
 },onEvent:e=>{state.events.push(e);events();}});
-window.addEventListener('keydown',e=>{if(!$('help-panel').classList.contains('hidden')){if(e.code==='Escape'){e.preventDefault();closeHelp();}return;}if(!started&&online.active){if(e.code==='Escape'&&!e.target.closest?.('input,select'))online.leave();return;}if(!started&&($('screen').contains(document.activeElement)||document.activeElement===document.body)&&lobbyMenu.handleKey(e)){e.preventDefault();return;}if(used.has(e.code)&&started)e.preventDefault();if(e.code==='Escape'&&!e.repeat&&started)togglePause();keys.add(e.code);});
+const controllerKeyboard=new ControllerKeyboard(),menuController=new MenuController({cue:()=>lobbyMenu.cue(),edit:e=>controllerKeyboard.open(e)});
+window.addEventListener('keydown',e=>{if(controllerKeyboard.target){if(e.code==='Escape'){e.preventDefault();controllerKeyboard.close();}return;}if(!$('help-panel').classList.contains('hidden')){if(e.code==='Escape'){e.preventDefault();closeHelp();}return;}if(!started&&online.active){if(e.code==='Escape'&&!e.target.closest?.('input,select'))online.leave();return;}if(!started&&($('screen').contains(document.activeElement)||document.activeElement===document.body)&&lobbyMenu.handleKey(e)){e.preventDefault();return;}if(used.has(e.code)&&started)e.preventDefault();if(e.code==='Escape'&&!e.repeat&&started)togglePause();keys.add(e.code);});
 window.addEventListener('keyup',e=>keys.delete(e.code));
 window.addEventListener('blur',()=>{keys.clear();if(started&&!paused)togglePause(true);});
 document.addEventListener('visibilitychange',()=>{if(document.hidden){keys.clear();if(started&&!paused)togglePause(true);}});
@@ -37,7 +39,7 @@ let helpPaused=false;
 function openHelp(){helpPaused=started&&!paused;if(helpPaused)togglePause(true);$('help-panel').classList.remove('hidden');for(const id of ['menu','pause','game-hud','online-menu'])$(id).inert=true;$('help').setAttribute('aria-expanded','true');keys.clear();$('help-close').focus();}
 function closeHelp(){const resume=helpPaused;helpPaused=false;$('help-panel').classList.add('hidden');for(const id of ['menu','pause','game-hud','online-menu'])$(id).inert=false;$('help').setAttribute('aria-expanded','false');if(resume)togglePause(false);else (started?$('pause-controls'):online.active?$('online-back'):$('lobby-help')).focus();}
 $('help').onclick=openHelp;$('lobby-help').onclick=openHelp;$('pause-controls').onclick=openHelp;$('help-close').onclick=closeHelp;$('help-done').onclick=closeHelp;$('help-fullscreen').onclick=()=>$('fullscreen').click();
-const controlRows=[['Move',['A D','← →','STICK / D-PAD']],['Jump / flutter',['W','↑','SOUTH']],['Crouch / drop',['S','↓','DOWN']],['Fire',['F','K','WEST']],['Grab / door / revive',['G','L','NORTH']],['Call',['Q','O','EAST']],['Strafe',['SHIFT','ENTER','LB']],['Pause',['ESC','ESC','START']]];
+const controlRows=[['Move',['A D','← →','STICK / D-PAD']],['Jump / flutter',['W','↑','SOUTH']],['Crouch / drop',['S','↓','DOWN']],['Fire',['F','K','WEST']],['Grab / door / revive',['G','L','NORTH']],['Call',['Q','O','EAST']],['Strafe',['SHIFT','ENTER','LB']],['Pause',['ESC','ESC','START']],['Menu navigation',['TAB / SHIFT TAB','TAB / SHIFT TAB','UP / DOWN']],['Menu confirm / back',['ENTER / ESC','ENTER / ESC','SOUTH / EAST']]];
 function showControls(layout){const index=['p1','p2','pad'].indexOf(layout);$('control-list').innerHTML=controlRows.map(([action,bindings])=>`<div class="control-row"><span>${action}</span><kbd>${bindings[index]}</kbd></div>`).join('');document.querySelectorAll('[data-controls]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.controls===layout)));}
 document.querySelectorAll('[data-controls]').forEach(b=>b.onclick=()=>showControls(b.dataset.controls));showControls('p1');
 $('pause-button').onclick=()=>togglePause();$('resume').onclick=()=>togglePause(false);
@@ -48,7 +50,7 @@ $('quit').onclick=()=>online.active?online.leave():lobby();
 function pads(){return [...(navigator.getGamepads?.()||[])].filter(Boolean);}
 function startMatch(options){
  const count=options.players,required=count>2?count-2:0;if(pads().length<required){lobbyMenu.notice(`Connect ${required} controller${required>1?'s':''} and press any button on each.`);return;}
- mode=options.mode;state=createState(mode==='duel'&&count===4?'party':mode,options);started=true;paused=false;keys.clear();accumulator=0;hudKey='';upgradeKey='';previousPads=pads().length;padStart=pads().some(g=>g.buttons[9]?.pressed);
+ mode=options.mode;state=createState(mode==='duel'&&count===4?'party':mode,options);started=true;paused=false;keys.clear();accumulator=0;hudKey='';upgradeKey='';previousPads=pads().length;
  $('menu').classList.add('hidden');$('game-hud').classList.remove('hidden');$('inventory').classList.remove('hidden');$('status').classList.remove('hidden');$('pause').classList.add('hidden');$('help-panel').classList.add('hidden');for(const id of ['menu','pause','game-hud','online-menu'])$(id).inert=false;$('help').setAttribute('aria-expanded','false');$('pause-button').disabled=false;$('pause-button').textContent='Ⅱ';$('pause-button').setAttribute('aria-label','Pause');canvas.focus();audio.setPaused(false);scene();audio.unlock();syncHud();
 }
 function inputs(){
@@ -57,7 +59,20 @@ function inputs(){
  const i={left:axis<-.25||pressed(14),right:axis>.25||pressed(15),down:(g.axes[1]||0)>.4||pressed(13),jump:pressed(0),fire:pressed(2),grab:pressed(3),chirp:pressed(1),strafe:pressed(4)};list[id]={...list[id]};for(const [k,v]of Object.entries(i))list[id][k]=!!list[id][k]||v;
  });if(online.active){for(const key of Object.keys(binds[0]))list[0][key]=!!list[0][key]||!!list[1][key];return [list[0]];}return list;
 }
-function controllerStatus(){const gs=pads();if(!started&&!online.active&&$('help-panel').classList.contains('hidden'))lobbyMenu.poll(gs);if(!started&&online.active&&$('help-panel').classList.contains('hidden'))online.poll(gs);const start=gs.some(g=>g.buttons[9]?.pressed);if(start&&!padStart&&started)togglePause();padStart=start;if(started&&gs.length<previousPads){togglePause(true);$('status').textContent='CONTROLLER DISCONNECTED · PAUSED';}previousPads=gs.length;}
+function controllerScope(){
+ if(controllerKeyboard.target)return controllerKeyboard.scope();
+ if(!$('help-panel').classList.contains('hidden'))return {key:'help',root:$('help-panel'),initial:()=>$('help-close'),back:closeHelp,start:closeHelp};
+ if(paused)return {key:'pause',root:$('pause'),initial:()=>$('resume'),back:()=>togglePause(false),start:()=>togglePause(false)};
+ if(started&&!$('upgrade-menu').classList.contains('hidden'))return {key:'upgrades',root:$('upgrade-menu'),initial:()=>$('upgrade-players').querySelector('button:not(:disabled)')||$('next-wave'),back:()=>togglePause(true),start:()=>$('next-wave').click()};
+ if(started)return null;
+ if(online.active)return {key:'online-'+(online.room?'room':'entry'),root:$('online-menu'),initial:()=>$(online.room?'online-ready':'online-create'),back:()=>{if(online.room?.players.find(p=>p.id===online.slot)?.ready)$('online-ready').click();else online.leave();},start:()=>$(online.room?'online-start':'online-create').click(),bumper:delta=>{const e=$('online-species'),count=e.options.length;e.selectedIndex=(e.selectedIndex+delta+count)%count;e.dispatchEvent(new Event('change',{bubbles:true}));return true;}};
+ return lobbyMenu.controllerScope();
+}
+function controllerStatus(){
+ const gs=pads();lobbyMenu.updateDevices(gs);
+ menuController.poll(gs,controllerScope(),{secondary:(index,state,edge,old)=>{if(!started&&!online.active&&$('help-panel').classList.contains('hidden'))lobbyMenu.controllerSecondary(index,state,edge,old,menuController);},start:()=>{if(started)togglePause();else if(!online.active&&$('help-panel').classList.contains('hidden')&&lobbyMenu.allReady())lobbyMenu.confirm();}});
+ if(started&&gs.length<previousPads){togglePause(true);$('status').textContent='CONTROLLER DISCONNECTED · PAUSED';}previousPads=gs.length;
+}
 function syncHud(){
  const key=JSON.stringify([started,state.mapIndex,state.phase,state.wave,state.round,state.scores,state.players.map(p=>[p.weapon,p.ammo,p.alive,p.downed,Math.ceil(p.hp),Math.ceil(p.bleed),p.points,p.kills])]);if(key===hudKey)return;hudKey=key;
  $('arena-label').textContent=state.map.name;$('arena-number').textContent=`${String(state.mapIndex+1).padStart(2,'0')} / ${MAPS.length} · ${state.map.size}`;
@@ -109,6 +124,6 @@ function render(){
 export function getSnapshot(){return {started,paused,mode,online:online.snapshot(),camera:camera.snapshot(),world:{width:state.map.width,height:state.map.height,size:state.map.size},lobby:{stage:lobbyMenu.stage,ready:[...lobbyMenu.ready],active:lobbyMenu.active,roster:[...roster],options:lobbyMenu.options()},phase:state.phase,mapIndex:state.mapIndex,wave:state.wave,enemies:state.enemies.length,remaining:state.remaining,players:state.players.map(p=>({id:p.id,x:p.x,y:p.y,w:p.w,h:p.h,weapon:p.weapon,ammo:p.ammo,alive:p.alive,hp:p.hp,points:p.points})),audio:{state:audio.context?.state,voices:audio.voices.size,musicVolume:audio.musicVolume,sfxVolume:audio.sfxVolume,enabled:audio.enabled,scene:audio.scene,theme:audio.theme}};}
 // Explicit QA-only hooks let integration tests exercise late-wave menus without waiting through a full match.
 if(new URLSearchParams(location.search).has('qa'))window.billBrawlQA={state:()=>state,audio,disconnect:()=>online.ws?.close(),nextWave:()=>{state.phase='wave-break';state.timer=12;state.remaining=0;state.enemies=[];for(const p of state.players)p.points=800;upgradeKey='';}};
-function frame(ms){const delta=Math.min(.1,(ms-last)/1000||0);last=ms;controllerStatus();if(online.active&&online.current){accumulator+=delta;while(accumulator>=1/60){online.step(paused||document.hidden?{}:inputs()[0]);accumulator-=1/60;}state=online.frame()||state;}else if(started&&!paused){accumulator+=delta;while(accumulator>=1/60){update(state,inputs(),1/60);accumulator-=1/60;}events();}else if(!started)state.time+=delta;if(started&&(!paused||online.active))camera.update(state.map,state.players,delta,state.round);else if(!started)camera.full(state.map);render();if(!started&&!online.active)lobbyMenu.draw(state.time);syncHud();syncUpgrades();requestAnimationFrame(frame);}
+function frame(ms){const delta=Math.min(.1,(ms-last)/1000||0);last=ms;controllerStatus();if(online.active&&online.current){accumulator+=delta;while(accumulator>=1/60){online.step(paused||document.hidden?{}:inputs()[0]);accumulator-=1/60;}state=online.frame()||state;}else if(started&&!paused){accumulator+=delta;while(accumulator>=1/60){update(state,$('upgrade-menu').classList.contains('hidden')?inputs():{},1/60);accumulator-=1/60;}events();}else if(!started)state.time+=delta;if(started&&(!paused||online.active))camera.update(state.map,state.players,delta,state.round);else if(!started)camera.full(state.map);render();if(!started&&!online.active)lobbyMenu.draw(state.time);syncHud();syncUpgrades();requestAnimationFrame(frame);}
 window.addEventListener('pagehide',()=>audio.setPaused(true));window.addEventListener('pageshow',()=>audio.setPaused(paused));
 $('status').classList.add('hidden');syncHud();requestAnimationFrame(frame);

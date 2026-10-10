@@ -89,21 +89,5 @@ export class OnlineArcade{
  leave(){this.explicitLeave=true;clearTimeout(this.retry);clearTimeout(this.connectTimer);this.release();this.send({type:'leave'});this.ws?.close();this.ws=null;this.clearSeat();this.token=null;this.room=null;this.current=null;this.authoritative=null;this.previous=null;this.you=null;this.slot=null;this.code=null;this.lastTick=-1;this.active=false;this.pending=[];this.connection='idle';
   $('online-menu').classList.add('hidden');$('online-connection').classList.add('hidden');$('online-entry').classList.remove('hidden');$('online-room').classList.add('hidden');$('online-name').disabled=false;$('online-create').disabled=$('online-join').disabled=$('online-rejoin').disabled=false;this.onExit();
  }
- poll(controllers){
-  const g=controllers[0];if(!g){this.padPrevious={};return;}const old=this.padPrevious||{},press=n=>!!g.buttons[n]?.pressed;
-  const dir=(g.axes[0]||0)<-.5||press(14)?-1:(g.axes[0]||0)>.5||press(15)?1:0,vertical=(g.axes[1]||0)<-.5||press(12)?-1:(g.axes[1]||0)>.5||press(13)?1:0;
-  const now={dir,vertical,a:press(0),b:press(1),start:press(9),lb:press(4),rb:press(5)};this.padPrevious=now;
-  const cycleSpecies=delta=>{const select=$('online-species'),id=SPECIES.indexOf(select.value);select.value=SPECIES[(id+delta+SPECIES.length)%SPECIES.length];select.dispatchEvent(new Event('change'));};
-  if(now.lb&&!old.lb)cycleSpecies(-1);if(now.rb&&!old.rb)cycleSpecies(1);
-  if(this.room){
-   const own=this.room.players.find(p=>p.id===this.slot);if(dir&&dir!==old.dir)cycleSpecies(dir);
-   if(vertical&&vertical!==old.vertical&&own?.host){$('online-arena').value=(Number($('online-arena').value)+vertical+MAPS.length)%MAPS.length;$('online-arena').dispatchEvent(new Event('change'));}
-   if(now.a&&!old.a)$('online-ready').click();if(now.start&&!old.start&&own?.host)$('online-start').click();if(now.b&&!old.b){if(own?.ready)this.send({type:'ready',ready:false});else this.leave();}
-  }else{
-   const choices=['online-create','online-code','online-join','online-rejoin','online-back'].map($).filter(e=>!e.disabled&&e.getBoundingClientRect().height);let index=choices.indexOf(document.activeElement);
-   const step=dir&&dir!==old.dir?dir:vertical&&vertical!==old.vertical?vertical:0;if(step){index=(Math.max(0,index)+step+choices.length)%choices.length;choices[index]?.focus();}
-   if(now.a&&!old.a){const target=choices.includes(document.activeElement)?document.activeElement:$('online-create');if(target.tagName==='BUTTON')target.click();else target.focus();}if(now.b&&!old.b)this.leave();
-  }
- }
  snapshot(){return {active:this.active,connection:this.connection,code:this.room?.code||null,you:this.you??null,slot:this.slot??null,players:this.room?.players||[],tick:this.lastTick,pending:this.pending.length,rtt:this.rtt,authoritative:this.authoritative?{round:this.authoritative.round,phase:this.authoritative.phase,scores:this.authoritative.scores,players:this.authoritative.players.map(({id,x,y,alive,weapon,ammo})=>({id,x,y,alive,weapon,ammo})),objects:this.authoritative.map.objects}:null};}
 }

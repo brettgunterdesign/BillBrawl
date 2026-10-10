@@ -8,7 +8,7 @@ const ARENA_DESCRIPTIONS=['Harbour cranes, stacked platforms, and a tide with ot
 const wrap=(n,max)=>(n+max)%max;
 export class ArcadeLobby{
  constructor({audio,roster,onPreview,onStart,onFullscreen}){
-  this.audio=audio;this.roster=roster;this.onPreview=onPreview;this.onStart=onStart;this.mode='duel';this.count=2;this.difficulty=DEFAULT_BOT_DIFFICULTY;this.arena=0;this.stage='mode';this.active=0;this.ready=Array(4).fill(false);this.padPrevious=new Map();this.devices=0;this.chirpUntil=Array(4).fill(0);this.time=0;this.reducedMotion=matchMedia('(prefers-reduced-motion: reduce)').matches;
+  this.audio=audio;this.roster=roster;this.onPreview=onPreview;this.onStart=onStart;this.mode='duel';this.count=2;this.difficulty=DEFAULT_BOT_DIFFICULTY;this.arena=0;this.stage='mode';this.active=0;this.ready=Array(4).fill(false);this.devices=0;this.chirpUntil=Array(4).fill(0);this.time=0;this.reducedMotion=matchMedia('(prefers-reduced-motion: reduce)').matches;
   document.querySelectorAll('[data-mode]').forEach(b=>b.onclick=()=>this.chooseMode(b.dataset.mode));
   $('mode-next').onclick=()=>this.show('crew');$('crew-back').onclick=()=>this.show('mode');$('arena-back').onclick=()=>this.show('crew');$('crew-next').onclick=()=>{if(this.allReady())this.show('arena');};
   $('arena-prev').onclick=()=>this.chooseArena(this.arena-1);$('arena-next').onclick=()=>this.chooseArena(this.arena+1);$('start').onclick=()=>this.launch();$('lobby-fullscreen').onclick=onFullscreen;
@@ -57,7 +57,7 @@ export class ArcadeLobby{
   $('species-choices').querySelectorAll('button').forEach(b=>{const selected=b.dataset.species===this.roster[this.active];b.classList.toggle('selected',selected);b.setAttribute('aria-pressed',String(selected));b.disabled=this.ready[this.active];this.speciesIcon(b.querySelector('canvas'),b.dataset.species);});
   $('start').firstChild.textContent=this.mode==='zombie'?'SURVIVE ':'BRAWL ';
   $('match-summary').textContent=MODE_NAMES[this.mode]+' · '+(this.mode==='practice'?this.difficulty+' BOT':this.count+' PLAYERS');
-  $('menu-hint').innerHTML=this.stage==='crew'?'<kbd>A D</kbd> / <kbd>← →</kbd> SELECT <kbd>F / K</kbd> READY':this.stage==='arena'?'<kbd>← →</kbd> SELECT <kbd>ENTER</kbd> PLAY':'<kbd>← →</kbd> SELECT <kbd>ENTER</kbd> NEXT';
+  $('menu-hint').innerHTML=this.devices?'<kbd>↑ ↓</kbd> MENU <kbd>← →</kbd> CHANGE <kbd>A</kbd> SELECT <kbd>B</kbd> BACK <kbd>START</kbd> NEXT':this.stage==='crew'?'<kbd>A D</kbd> / <kbd>← →</kbd> SELECT <kbd>F / K</kbd> READY':this.stage==='arena'?'<kbd>← →</kbd> SELECT <kbd>ENTER</kbd> PLAY':'<kbd>← →</kbd> SELECT <kbd>ENTER</kbd> NEXT';
   if(!this.errorUntil||this.errorUntil<this.time){$('mode-note').classList.remove('lobby-error');$('mode-note').textContent='';}
  }
  show(stage,{focus=true}={}){this.stage=stage;this.errorUntil=0;document.querySelectorAll('[data-stage]').forEach(n=>n.classList.toggle('hidden',n.dataset.stage!==stage));this.sync();this.cue();if(focus){const h=$('stage-'+stage).querySelector('h2');h.tabIndex=-1;h.focus({preventScroll:true});}}
@@ -82,14 +82,31 @@ export class ArcadeLobby{
   }else if(['KeyA','KeyD','ArrowLeft','ArrowRight'].includes(code)){const delta=code==='KeyA'||code==='ArrowLeft'?-1:1;if(this.stage==='mode')this.chooseMode(['duel','practice','zombie'][wrap(['duel','practice','zombie'].indexOf(this.mode)+delta,3)]);else this.chooseArena(this.arena+delta);return true;}
   return false;
  }
- poll(controllers){
-  if(this.devices!==controllers.length){this.devices=controllers.length;this.sync();$('pad-indicator').innerHTML=`<i></i>${controllers.length?controllers.length+' PAD'+(controllers.length>1?'S':'')+' CONNECTED':'LOCAL PLAY'}`;}
-  const current=new Map();
-  controllers.forEach((g,index)=>{const id=this.options().players>2?index+2:index,prev=this.padPrevious.get(g.index)||{},press=n=>!!g.buttons[n]?.pressed,dir=(g.axes[0]||0)<-.5||press(14)?-1:(g.axes[0]||0)>.5||press(15)?1:0,a=press(0),b=press(1),start=press(9),lb=press(4),rb=press(5);current.set(g.index,{dir,a,b,start,lb,rb});
-   if(this.stage==='crew'&&index===0&&((lb&&!prev.lb)||(rb&&!prev.rb))){this.cycleSetup(rb?1:-1);return;}
-   if(this.stage==='crew'&&id<this.options().players){if(dir&&dir!==prev.dir)this.cycleSpecies(id,dir);if(a&&!prev.a)this.toggleReady(id,true);if(b&&!prev.b){if(this.ready[id])this.toggleReady(id,false);else this.back();}if(start&&!prev.start&&this.allReady())this.show('arena');}
-   else if(index===0){if(dir&&dir!==prev.dir){if(this.stage==='mode')this.chooseMode(['duel','practice','zombie'][wrap(['duel','practice','zombie'].indexOf(this.mode)+dir,3)]);else if(this.stage==='arena')this.chooseArena(this.arena+dir);}if(a&&!prev.a)this.confirm();if(b&&!prev.b)this.back();}
-  });this.padPrevious=current;
+ updateDevices(controllers){
+  if(this.devices===controllers.length)return;this.devices=controllers.length;this.sync();$('pad-indicator').innerHTML=`<i></i>${controllers.length?controllers.length+' PAD'+(controllers.length>1?'S':'')+' CONNECTED':'LOCAL PLAY'}`;
+ }
+ controllerScope(){
+  const owned=this.options().players>2?2:0,ready=()=>$('roster').querySelector(`[data-ready="${owned}"]`);
+  return {key:'lobby-'+this.stage,root:$('menu'),initial:()=>this.stage==='crew'?ready():$(this.stage==='mode'?'mode-next':'start'),
+   back:nav=>{if(this.stage==='crew'&&this.ready[owned]){this.toggleReady(owned,false);nav.focus(ready());}else this.back();},
+   start:()=>{if(this.stage!=='crew'||this.allReady())this.confirm();else this.notice('Ready every player first.');},
+   bumper:(delta,nav)=>{if(this.stage!=='crew')return false;this.cycleSetup(delta);nav.focus(this.controllerScope().initial());return true;},
+   horizontal:(delta,e)=>{
+    if(this.stage==='crew'&&e?.hasAttribute('data-ready')){this.cycleSpecies(Number(e.dataset.ready),delta);return true;}
+    if(this.stage==='mode'&&(e?.id==='mode-next'||e?.hasAttribute('data-mode'))){this.chooseMode(['duel','practice','zombie'][wrap(['duel','practice','zombie'].indexOf(this.mode)+delta,3)]);return true;}
+    if(this.stage==='arena'&&e?.id==='start'){this.chooseArena(this.arena+delta);return true;}return false;
+   },
+   confirm:(e,nav)=>{if(this.stage!=='crew'||!e?.hasAttribute('data-ready'))return false;
+    const id=Number(e.dataset.ready);if(this.ready[id]&&this.allReady()){this.show('arena');return true;}this.toggleReady(id,true);if(this.allReady())nav.focus($('crew-next'));return true;
+   },
+   afterActivate:(e,nav)=>{if(e.hasAttribute('data-mode'))nav.focus($('mode-next'));}
+  };
+ }
+ controllerSecondary(index,state,edge,old,nav){
+  if(this.stage!=='crew')return;const id=this.options().players>2?index+2:index;if(id>=this.options().players)return;
+  if(state.x&&state.x!==old.x)this.cycleSpecies(id,state.x);
+  if(edge('a')){this.toggleReady(id,true);if(this.allReady())nav.focus($('crew-next'));}
+  if(edge('b'))this.toggleReady(id,false);
  }
  speciesIcon(canvas,name){const c=canvas.getContext('2d');c.setTransform(2,0,0,2,0,0);c.clearRect(0,0,72,43);c.imageSmoothingEnabled=false;drawCharacter(c,{id:this.active,x:25,y:17,w:16,h:22,dir:1,vx:0,alive:true},{species:name,color:COLORS[this.active]});}
  draw(time){

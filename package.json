@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "test": "node tests/engine.test.mjs && node tests/bot.test.mjs && node tests/camera.test.mjs && node tests/audio.test.mjs && node tests/content.test.mjs && node tests/world.test.mjs && node tests/playtest.test.mjs",
-    "check": "node --check dist/content.js && node --check dist/engine.js && node --check dist/audio.js && node --check dist/sprites.js && node --check dist/world.js && node --check dist/game.js && node --check dist/lobby.js && node --check dist/camera.js && node --check dist/terrain.js && node --check dist/terrain-art.js && node --check dist/online.js && node --check dist/online-config.js && node --check server/index.mjs && node --check scripts/playtest/agent.mjs && node --check scripts/playtest/checks.mjs && node --check scripts/playtest/run.mjs && node --check scripts/playtest/browser.mjs && node --check scripts/playtest/driver.mjs && node --check scripts/playtest/jev/features.mjs && node --check scripts/playtest/jev/driver.mjs && node --check scripts/playtest/jev/run.mjs && node --check scripts/playtest/jev/setup.mjs",
+    "check": "node --check dist/content.js && node --check dist/engine.js && node --check dist/audio.js && node --check dist/sprites.js && node --check dist/world.js && node --check dist/game.js && node --check dist/lobby.js && node --check dist/camera.js && node --check dist/terrain.js && node --check dist/terrain-art.js && node --check dist/online.js && node --check dist/online-config.js && node --check server/index.mjs && node --check scripts/playtest/agent.mjs && node --check scripts/playtest/checks.mjs && node --check scripts/playtest/run.mjs && node --check scripts/playtest/browser.mjs && node --check scripts/playtest/driver.mjs && node --check scripts/playtest/jev/features.mjs && node --check scripts/playtest/jev/driver.mjs && node --check scripts/playtest/jev/run.mjs && node --check scripts/playtest/jev/setup.mjs && node --check dist/menu-controller.js",
     "test:levels": "node tests/levels.test.mjs",
     "audit:levels": "node scripts/audit-levels.mjs",
     "test:browser": "node tests/browser.mjs",
@@ -20,6 +20,7 @@
     "playtest:jev": "node scripts/playtest/jev/run.mjs",
     "playtest:jev:mock": "node scripts/playtest/jev/run.mjs --mock",
     "test:jev": "node tests/jev.test.mjs",
-    "freeze:jev": "node scripts/playtest/jev/freeze.mjs"
+    "freeze:jev": "node scripts/playtest/jev/freeze.mjs",
+    "test:controller:browser": "node tests/controller-browser.mjs"
   }
 }
