@@ -12,6 +12,12 @@ python -m http.server 8080 --directory dist
 
 Open `http://localhost:8080` in a desktop browser. Two players share a keyboard or use controllers. Three/four-human survival uses keyboard players 1–2 and one/two controllers for players 3–4; four-player PvP uses the same mapping. Solo practice has easy, normal, and hard bot settings. Controls appear below the arena and in How to Play. Mobile rendering is responsive, but touch controls and internet multiplayer are not implemented.
 
+## Arcade lobby
+
+Match setup is a three-screen arcade flow: animated mode cards, character select, and destination select. Choose Classic Brawl, Bot Practice, or Horde Survival; choose the player count or bot difficulty; then lock in every human's species before choosing an arena. Characters have large animated previews, player-coloured podiums, personality descriptions, six roster tiles, and independent ready/unlock indicators. Fullscreen is available inside the lobby.
+
+Mouse, keyboard, and standard-mapped controllers navigate the menu. Left/right selects modes and arenas; Enter confirms and Escape goes back. In character select, P1 uses A/D and F to ready, G to unlock; P2 uses left/right and K to ready, L to unlock. Controllers use left/right, south to ready/confirm, east to unlock/back, and Start to advance when the crew is ready. W/S or controller bumpers cycle the player count or bot difficulty. For three/four humans, controller mapping matches gameplay: controllers select players 3–4, keyboard selects players 1–2. The lobby preserves species, arena, player count, and difficulty across rematches but resets ready indicators. All species have equal gameplay stats. Reduced-motion preferences disable lobby sprite motion and transitions.
+
 ## Modes and content
 
 - Classic PvP: 2 or 4 players, one-hit eliminations, first to ten round wins, simultaneous-death draws. Seven handcrafted arenas rotate from the selected starting arena; tide or lava rises after 25 seconds.
@@ -30,8 +36,8 @@ Audio begins with a play or sound-button gesture, as required by browser autopla
 Buildless JavaScript modules with a Canvas renderer and a fixed 60 Hz game simulation. Swept bullet collision prevents tunnelling. Combat resolves simultaneous deaths before scoring. The engine is independent of the DOM. Graph navigation routes bots and zombies across platform geometry.
 
 - `npm test`: 20 engine regression checks, including bot combat and zombie pursuit in all seven worlds, all eleven attacks, wall/piercing collisions, friendly fire, rewards, revival, bleed-out, team wipe, supplies, upgrades, and progression beyond wave 100.
-- `npm run check`: syntax checks for all six JavaScript modules.
-- `npm run test:browser`: Playwright integration checks using the environment-provided Chromium and Playwright. Tests cover galleries, keyboard movement/pickup/fire, bot activity, co-op survival, upgrades, audio graph signal for all eleven weapons, mute/pause/volume, virtual Gamepad mappings/disconnect, and desktop/mobile layouts. Physical controller hardware and subjective soundtrack listening have not been tested.
+- `npm run check`: syntax checks for all seven JavaScript modules.
+- `npm run test:browser`: Playwright integration checks using the environment-provided Chromium and Playwright. Tests cover the three lobby screens, independent ready/unlock and species choices, back navigation, virtual controller-only setup, keyboard/mouse input, fullscreen, all player counts at seven viewport widths from 320–1440 pixels, galleries, movement/pickup/fire, active bots, co-op upgrades, audio controls, and controller disconnect. The prior release also checked audio graph signal for all eleven weapons. Physical controller hardware and subjective soundtrack listening have not been tested.
 
 The read-only `getSnapshot()` module export supports diagnostics. `?qa=1` enables explicit local test hooks for late-wave UI checks; normal play does not enable those hooks. Browser test screenshots are ignored by Git.
 

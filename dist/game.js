@@ -1,5 +1,6 @@
 import {createState,update,MAPS,COLORS,WEAPONS,beginWave,buyUpgrade,upgradeCost} from './engine.js';
 import {AudioDirector} from './audio.js';
+import {ArcadeLobby} from './lobby.js';
 import {SPECIES,drawCharacter,drawWeapon,drawWeaponIcon} from './sprites.js';
 import {drawBackground,drawArena,drawWater} from './world.js';
 const $=id=>document.getElementById(id),canvas=$('game'),ctx=canvas.getContext('2d'),audio=new AudioDirector();
@@ -7,27 +8,10 @@ let state=createState(),started=false,paused=false,mode='duel',keys=new Set(),ac
 const roster=['platypus','duck','toucan','pelican'];
 const binds=[{left:'KeyA',right:'KeyD',jump:'KeyW',down:'KeyS',fire:'KeyF',grab:'KeyG',chirp:'KeyQ',strafe:'ShiftLeft'},{left:'ArrowLeft',right:'ArrowRight',jump:'ArrowUp',down:'ArrowDown',fire:'KeyK',grab:'KeyL',chirp:'KeyO',strafe:'Enter'}];
 const used=new Set([...Object.values(binds[0]),...Object.values(binds[1]),'Escape','Space']);
-const humanCount=()=>mode==='practice'?1:Number($('player-count').value);
 const theme=()=>({snow:'ice',ruins:'jungle',foundry:'lava'}[state.map.theme]||state.map.theme);
 function scene(){audio.setScene(!started?'lobby':state.phase==='game-over'||state.phase==='match-over'?'gameover':state.zombie?'zombie':'pvp',theme());}
 function art(target,paint,w,h){target.width=w*2;target.height=h*2;const c=target.getContext('2d');c.scale(2,2);c.imageSmoothingEnabled=false;paint(c);}
-function portrait(target,name,id=0){art(target,c=>drawCharacter(c,{id,x:28,y:26,w:16,h:22,dir:1,vx:0,alive:true,hp:100},{species:name,time:0,color:COLORS[id]}),72,53);}
-function rosterUI(){
- $('roster').innerHTML=roster.slice(0,humanCount()).map((name,id)=>`<label><span style="color:${COLORS[id]}">PLAYER ${String(id+1).padStart(2,'0')}</span><canvas aria-label="${name} preview"></canvas><select aria-label="Player ${id+1} species" data-player="${id}">${SPECIES.map(n=>`<option value="${n}"${n===name?' selected':''}>${n.toUpperCase()}</option>`).join('')}</select></label>`).join('');
- $('roster').querySelectorAll('select').forEach(select=>{const id=Number(select.dataset.player),preview=select.previousElementSibling;portrait(preview,roster[id],id);select.onchange=()=>{roster[id]=select.value;preview.setAttribute('aria-label',select.value+' preview');portrait(preview,roster[id],id);audio.play('ui');};});
-}
-function configureMode(){
- const current=Number($('player-count').value),choices=mode==='zombie'?[1,2,3,4]:[2,4];
- $('player-count').innerHTML=choices.map(n=>`<option value="${n}"${n===current?' selected':''}>${n} PLAYER${n>1?'S':''}</option>`).join('');
- $('players-label').classList.toggle('hidden',mode==='practice');$('difficulty-label').classList.toggle('hidden',mode!=='practice');
- $('mode-note').textContent=mode==='zombie'?'Endless waves. Shared survival. Hold grab to revive a teammate.':mode==='practice'?'An active opponent: choose easy, normal, or hard. Player 01 controls.':'Share a keyboard or connect controllers. Music starts with play.';
- $('start').firstChild.textContent=mode==='zombie'?'SURVIVE THE HORDE ':'LET’S CAUSE TROUBLE ';rosterUI();
-}
-$('arena-choice').innerHTML=MAPS.map((m,id)=>`<option value="${id}">${m.name}</option>`).join('');
-$('arena-choice').onchange=()=>{if(!started){state=createState(mode,{arena:Number($('arena-choice').value),players:humanCount()});hudKey='';scene();}};
-$('player-count').onchange=rosterUI;
-document.querySelectorAll('[data-mode]').forEach(b=>b.onclick=()=>{mode=b.dataset.mode;document.querySelectorAll('[data-mode]').forEach(x=>{x.classList.toggle('selected',x===b);x.setAttribute('aria-pressed',String(x===b));});configureMode();audio.play('ui');});
-configureMode();
+const lobbyMenu=new ArcadeLobby({audio,roster,onPreview:options=>{mode=options.mode;if(!started){state=createState(mode,options);hudKey='';scene();}},onStart:startMatch,onFullscreen:()=> $('fullscreen').click()});
 function collections(){
  const descriptions=['Paddle tail. Shovel bill.','Classic yellow trouble.','Long bill. Big appetite.','Tropical colour. Huge bill.','Bright beak. Tiny menace.','Tall crest. Serious stare.'];
  $('species-gallery').innerHTML=SPECIES.map((name,id)=>`<article class="species-card"><canvas aria-label="${name}"></canvas><h4>${name.toUpperCase()}</h4><p>${descriptions[id]}</p></article>`).join('');
@@ -38,33 +22,34 @@ function collections(){
  $('world-gallery').querySelectorAll('canvas').forEach((c,id)=>{c.width=640;c.height=360;const x=c.getContext('2d');drawBackground(x,MAPS[id]);drawArena(x,MAPS[id]);drawWater(x,MAPS[id],352,0);});
 }
 collections();
-window.addEventListener('keydown',e=>{if(used.has(e.code)&&started)e.preventDefault();if(e.code==='Escape'&&!e.repeat&&started)togglePause();keys.add(e.code);});
+window.addEventListener('keydown',e=>{if(!started&&($('screen').contains(document.activeElement)||document.activeElement===document.body)&&lobbyMenu.handleKey(e)){e.preventDefault();return;}if(used.has(e.code)&&started)e.preventDefault();if(e.code==='Escape'&&!e.repeat&&started)togglePause();keys.add(e.code);});
 window.addEventListener('keyup',e=>keys.delete(e.code));
 window.addEventListener('blur',()=>{keys.clear();if(started&&!paused)togglePause(true);});
 document.addEventListener('visibilitychange',()=>{if(document.hidden){keys.clear();if(started&&!paused)togglePause(true);}});
 function togglePause(force){if(!started)return;paused=force??!paused;$('pause').classList.toggle('hidden',!paused);$('pause-button').textContent=paused?'RESUME ▶':'PAUSE II';keys.clear();accumulator=0;audio.setPaused(paused);if(!paused){audio.unlock();canvas.focus();}syncUpgrades();}
 $('sound').onclick=()=>{sound=!sound;audio.setEnabled(sound);if(sound)audio.unlock();$('sound').textContent=sound?'SOUND ON':'SOUND OFF';$('sound').setAttribute('aria-label',sound?'Disable sound':'Enable sound');$('sound').setAttribute('aria-pressed',String(sound));audio.play('ui');};
 for(const id of ['music-volume','sfx-volume'])$(id).oninput=()=>audio.setVolumes(Number($('music-volume').value)/100,Number($('sfx-volume').value)/100);
+document.addEventListener('fullscreenchange',()=>{const label=document.fullscreenElement?'Exit fullscreen':'Enter fullscreen';for(const id of ['fullscreen','lobby-fullscreen']){$(id).setAttribute('aria-label',label);$(id).title=label;}});
 $('fullscreen').onclick=async()=>{try{if(document.fullscreenElement)await document.exitFullscreen();else await $('screen').requestFullscreen();}catch{$('status').textContent='FULLSCREEN IS UNAVAILABLE IN THIS BROWSER';}};
 $('help').onclick=()=>{const hidden=$('help-panel').classList.toggle('hidden');$('help').setAttribute('aria-expanded',String(!hidden));if(!hidden&&started&&!paused)togglePause(true);};
 $('pause-button').onclick=()=>togglePause();$('resume').onclick=()=>togglePause(false);
 function lobby(caption='A whole flock of questionable behaviour.'){
- started=false;paused=false;keys.clear();accumulator=0;audio.setPaused(false);$('pause').classList.add('hidden');$('upgrade-menu').classList.add('hidden');$('menu').classList.remove('hidden');$('menu-caption').textContent=caption;$('pause-button').disabled=true;$('pause-button').textContent='PAUSE II';$('announcement').textContent='';$('status').textContent='READY WHEN YOU ARE';state=createState(mode,{arena:Number($('arena-choice').value),players:humanCount()});hudKey='';scene();syncHud();
+ started=false;paused=false;keys.clear();accumulator=0;audio.setPaused(false);$('pause').classList.add('hidden');$('upgrade-menu').classList.add('hidden');$('menu').classList.remove('hidden');lobbyMenu.reset(caption);$('pause-button').disabled=true;$('pause-button').textContent='PAUSE II';$('announcement').textContent='';$('status').textContent='READY WHEN YOU ARE';state=createState(mode,lobbyMenu.options());hudKey='';scene();syncHud();
 }
 $('quit').onclick=()=>lobby();
 function pads(){return [...(navigator.getGamepads?.()||[])].filter(Boolean);}
-$('start').onclick=()=>{
- const count=humanCount(),required=count>2?count-2:0;if(pads().length<required){$('mode-note').textContent=`Connect ${required} controller${required>1?'s':''} and press any button on each.`;return;}
- state=createState(mode==='duel'&&count===4?'party':mode,{players:count,arena:Number($('arena-choice').value),difficulty:$('difficulty').value});started=true;paused=false;keys.clear();accumulator=0;hudKey='';upgradeKey='';previousPads=pads().length;padStart=pads().some(g=>g.buttons[9]?.pressed);
+function startMatch(options){
+ const count=options.players,required=count>2?count-2:0;if(pads().length<required){lobbyMenu.notice(`Connect ${required} controller${required>1?'s':''} and press any button on each.`);return;}
+ mode=options.mode;state=createState(mode==='duel'&&count===4?'party':mode,options);started=true;paused=false;keys.clear();accumulator=0;hudKey='';upgradeKey='';previousPads=pads().length;padStart=pads().some(g=>g.buttons[9]?.pressed);
  $('menu').classList.add('hidden');$('pause').classList.add('hidden');$('help-panel').classList.add('hidden');$('help').setAttribute('aria-expanded','false');$('pause-button').disabled=false;$('pause-button').textContent='PAUSE II';canvas.focus();audio.setPaused(false);scene();audio.unlock();syncHud();
-};
+}
 function inputs(){
  const list=binds.map(binding=>Object.fromEntries(Object.entries(binding).map(([a,k])=>[a,keys.has(k)])));
  pads().forEach((g,index)=>{const id=state.count>2?index+2:index;if(id>=state.count||mode==='practice'&&id>0)return;const pressed=n=>!!g.buttons[n]?.pressed,axis=g.axes[0]||0;
  const i={left:axis<-.25||pressed(14),right:axis>.25||pressed(15),down:(g.axes[1]||0)>.4||pressed(13),jump:pressed(0),fire:pressed(2),grab:pressed(3),chirp:pressed(1),strafe:pressed(4)};list[id]={...list[id]};for(const [k,v]of Object.entries(i))list[id][k]=!!list[id][k]||v;
  });return list;
 }
-function controllerStatus(){const gs=pads(),start=gs.some(g=>g.buttons[9]?.pressed);if(start&&!padStart&&started)togglePause();padStart=start;if(started&&gs.length<previousPads){togglePause(true);$('status').textContent='CONTROLLER DISCONNECTED · PAUSED';}previousPads=gs.length;}
+function controllerStatus(){const gs=pads();if(!started)lobbyMenu.poll(gs);const start=gs.some(g=>g.buttons[9]?.pressed);if(start&&!padStart&&started)togglePause();padStart=start;if(started&&gs.length<previousPads){togglePause(true);$('status').textContent='CONTROLLER DISCONNECTED · PAUSED';}previousPads=gs.length;}
 function syncHud(){
  const key=JSON.stringify([started,state.mapIndex,state.phase,state.wave,state.round,state.scores,state.players.map(p=>[p.weapon,p.ammo,p.alive,p.downed,Math.ceil(p.hp),Math.ceil(p.bleed),p.points,p.kills])]);if(key===hudKey)return;hudKey=key;
  $('arena-label').textContent=state.map.name;$('arena-number').textContent=`0${state.mapIndex+1} / 07`;
@@ -110,9 +95,9 @@ function render(){
  else if(state.phase==='game-over'){$('announcement').innerHTML=`THE HORDE WINS.<small>WAVE ${state.wave} · ${state.teamKills} TEAM KILLS</small>`;$('status').textContent='SURVIVAL OVER';if(state.timer<=0)lobby(`Survived to wave ${state.wave}. ${state.teamKills} team kills. Try again?`);}
  else {$('announcement').innerHTML=state.winner===null?'DOUBLE TROUBLE.<small>DRAW · NO POINTS</small>':`${mode==='practice'&&state.winner===1?'THE BOT':`PLAYER ${state.winner+1}`} ${state.phase==='match-over'?'TAKES THE CROWN!':'WINS!'}<small>${state.phase==='match-over'?'TEN POINTS. ZERO MODESTY.':'ANOTHER ROUND. ANOTHER GRUDGE.'}</small>`;if(state.phase==='match-over'&&state.timer<=0)lobby(`Player ${state.winner+1} wins ${state.scores.join(' – ')}. Run it back?`);}
 }
-export function getSnapshot(){return {started,paused,mode,phase:state.phase,mapIndex:state.mapIndex,wave:state.wave,enemies:state.enemies.length,remaining:state.remaining,players:state.players.map(p=>({id:p.id,x:p.x,y:p.y,weapon:p.weapon,ammo:p.ammo,alive:p.alive,hp:p.hp,points:p.points})),audio:{state:audio.context?.state,voices:audio.voices.size,musicVolume:audio.musicVolume,sfxVolume:audio.sfxVolume,enabled:audio.enabled,scene:audio.scene,theme:audio.theme}};}
+export function getSnapshot(){return {started,paused,mode,lobby:{stage:lobbyMenu.stage,ready:[...lobbyMenu.ready],active:lobbyMenu.active,roster:[...roster],options:lobbyMenu.options()},phase:state.phase,mapIndex:state.mapIndex,wave:state.wave,enemies:state.enemies.length,remaining:state.remaining,players:state.players.map(p=>({id:p.id,x:p.x,y:p.y,weapon:p.weapon,ammo:p.ammo,alive:p.alive,hp:p.hp,points:p.points})),audio:{state:audio.context?.state,voices:audio.voices.size,musicVolume:audio.musicVolume,sfxVolume:audio.sfxVolume,enabled:audio.enabled,scene:audio.scene,theme:audio.theme}};}
 // Explicit QA-only hooks let integration tests exercise late-wave menus without waiting through a full match.
 if(new URLSearchParams(location.search).has('qa'))window.billBrawlQA={state:()=>state,audio,nextWave:()=>{state.phase='wave-break';state.timer=12;state.remaining=0;state.enemies=[];for(const p of state.players)p.points=800;upgradeKey='';}};
-function frame(ms){const delta=Math.min(.1,(ms-last)/1000||0);last=ms;controllerStatus();if(started&&!paused){accumulator+=delta;while(accumulator>=1/60){update(state,inputs(),1/60);accumulator-=1/60;}events();}else if(!started)state.time+=delta;render();syncHud();syncUpgrades();requestAnimationFrame(frame);}
+function frame(ms){const delta=Math.min(.1,(ms-last)/1000||0);last=ms;controllerStatus();if(started&&!paused){accumulator+=delta;while(accumulator>=1/60){update(state,inputs(),1/60);accumulator-=1/60;}events();}else if(!started)state.time+=delta;render();if(!started)lobbyMenu.draw(state.time);syncHud();syncUpgrades();requestAnimationFrame(frame);}
 window.addEventListener('pagehide',()=>audio.setPaused(true));window.addEventListener('pageshow',()=>audio.setPaused(paused));
 syncHud();requestAnimationFrame(frame);
