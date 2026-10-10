@@ -1,9 +1,10 @@
 import {createState,update,MAPS,COLORS,WEAPONS,beginWave,buyUpgrade,upgradeCost} from './engine.js';
 import {AudioDirector} from './audio.js';
 import {ArcadeLobby} from './lobby.js';
+import {SharedCamera} from './camera.js';
 import {SPECIES,drawCharacter,drawWeapon,drawWeaponIcon} from './sprites.js';
-import {drawBackground,drawArena,drawWater} from './world.js';
-const $=id=>document.getElementById(id),canvas=$('game'),ctx=canvas.getContext('2d'),audio=new AudioDirector();
+import {drawBackground,drawArena,drawWater,drawMapPreview} from './world.js';
+const $=id=>document.getElementById(id),canvas=$('game'),ctx=canvas.getContext('2d'),audio=new AudioDirector(),camera=new SharedCamera();
 let state=createState(),started=false,paused=false,mode='duel',keys=new Set(),accumulator=0,last=0,sound=true,hudKey='',upgradeKey='',padStart=false,previousPads=0;
 const roster=['platypus','duck','toucan','pelican'];
 const binds=[{left:'KeyA',right:'KeyD',jump:'KeyW',down:'KeyS',fire:'KeyF',grab:'KeyG',chirp:'KeyQ',strafe:'ShiftLeft'},{left:'ArrowLeft',right:'ArrowRight',jump:'ArrowUp',down:'ArrowDown',fire:'KeyK',grab:'KeyL',chirp:'KeyO',strafe:'Enter'}];
@@ -18,8 +19,8 @@ function collections(){
  $('species-gallery').querySelectorAll('canvas').forEach((c,id)=>art(c,x=>drawCharacter(x,{id:id%4,x:42,y:49,w:16,h:22,dir:1,vx:0,alive:true},{species:SPECIES[id],color:COLORS[id%4]}),108,85));
  $('weapon-gallery').innerHTML=Object.entries(WEAPONS).map(([key,w])=>`<article class="weapon-card" style="--weapon-color:${w.color}"><div class="weapon-art"><canvas data-weapon="${key}" aria-label="${w.name}"></canvas><span class="ammo-tag">${w.ammo<0?'∞':w.ammo} ${key==='flamethrower'?'FUEL':'AMMO'}</span></div><h4>${w.name}</h4><p>${w.desc}</p></article>`).join('');
  $('weapon-gallery').querySelectorAll('canvas').forEach(c=>art(c,x=>drawWeaponIcon(x,45,23,c.dataset.weapon,1.4),95,45));
- $('world-gallery').innerHTML=MAPS.map(m=>`<article class="world-card"><canvas aria-label="${m.name} preview"></canvas><h4>${m.name}</h4><p>${m.tag}</p></article>`).join('');
- $('world-gallery').querySelectorAll('canvas').forEach((c,id)=>{c.width=640;c.height=360;const x=c.getContext('2d');drawBackground(x,MAPS[id]);drawArena(x,MAPS[id]);drawWater(x,MAPS[id],352,0);});
+ $('world-gallery').innerHTML=MAPS.map(m=>`<article class="world-card"><canvas aria-label="${m.name} preview"></canvas><h4>${m.name}</h4><p>${m.size} · ${m.width} × ${m.height} · ${m.tag}</p></article>`).join('');
+ $('world-gallery').querySelectorAll('canvas').forEach((c,id)=>{c.width=640;c.height=360;const x=c.getContext('2d');drawMapPreview(x,MAPS[id]);});
 }
 collections();
 window.addEventListener('keydown',e=>{if(!started&&($('screen').contains(document.activeElement)||document.activeElement===document.body)&&lobbyMenu.handleKey(e)){e.preventDefault();return;}if(used.has(e.code)&&started)e.preventDefault();if(e.code==='Escape'&&!e.repeat&&started)togglePause();keys.add(e.code);});
@@ -52,7 +53,7 @@ function inputs(){
 function controllerStatus(){const gs=pads();if(!started)lobbyMenu.poll(gs);const start=gs.some(g=>g.buttons[9]?.pressed);if(start&&!padStart&&started)togglePause();padStart=start;if(started&&gs.length<previousPads){togglePause(true);$('status').textContent='CONTROLLER DISCONNECTED · PAUSED';}previousPads=gs.length;}
 function syncHud(){
  const key=JSON.stringify([started,state.mapIndex,state.phase,state.wave,state.round,state.scores,state.players.map(p=>[p.weapon,p.ammo,p.alive,p.downed,Math.ceil(p.hp),Math.ceil(p.bleed),p.points,p.kills])]);if(key===hudKey)return;hudKey=key;
- $('arena-label').textContent=state.map.name;$('arena-number').textContent=`0${state.mapIndex+1} / 07`;
+ $('arena-label').textContent=state.map.name;$('arena-number').textContent=`0${state.mapIndex+1} / 07 · ${state.map.size}`;
  $('scores').innerHTML=state.players.map((p,id)=>`<span style="--player-color:${COLORS[id]}"><i></i>${state.zombie?`P${id+1} <b class="hp-inline">${p.alive?Math.ceil(p.hp)+' HP':p.downed?'DOWN':'OUT'}</b>`:String(state.scores[id]).padStart(2,'0')}</span>`).join('');
  $('round-label').textContent=state.zombie?`WAVE ${state.wave} · ${state.teamKills} KILLS`:started?`ROUND ${String(state.round).padStart(2,'0')} · FIRST TO 10`:'FIRST TO 10';
  if(!started){$('inventory').innerHTML='';return;}
@@ -67,16 +68,17 @@ function syncUpgrades(){
  $('upgrade-players').querySelectorAll('button').forEach(b=>b.onclick=()=>{buyUpgrade(state,Number(b.dataset.id),b.dataset.upgrade);syncUpgrades();syncHud();events();});
 }
 $('next-wave').onclick=()=>{if(state.phase==='wave-break'){beginWave(state);keys.clear();accumulator=0;syncUpgrades();events();canvas.focus();}};
-function events(){for(const e of state.events){if(e.type==='round'||e.type==='wave')scene();if(e.type==='gameover'||e.match)scene();audio.play(e.type==='hurt'?'hit':e.type==='death'&&e.downed?'down':e.type,{...e,x:state.players[e.id]?.x,species:roster[e.id],wave:state.wave});}state.events=[];}
+function events(){for(const e of state.events){if(e.type==='round'||e.type==='wave')scene();if(e.type==='gameover'||e.match)scene();const worldX=state.players[e.id]?.x??e.x;audio.play(e.type==='hurt'?'hit':e.type==='death'&&e.downed?'down':e.type,{...e,x:Number.isFinite(worldX)?(worldX-camera.x)*camera.scale:undefined,species:roster[e.id],wave:state.wave});}state.events=[];}
+
 const rect=(x,y,w,h,color)=>{ctx.fillStyle=color;ctx.fillRect(Math.round(x),Math.round(y),w,h);};
 function label(text,x,y,color='#fff1d0',size=7){ctx.font=`bold ${size}px monospace`;ctx.textAlign='center';ctx.fillStyle='#172823';ctx.fillText(text,x+1,y+1);ctx.fillStyle=color;ctx.fillText(text,x,y);}
 function playerArt(p){
  if(p.downed){drawCharacter(ctx,{...p,alive:true,weapon:null,vx:0,h:14,y:p.y+p.h-14},{species:roster[p.id],time:state.time,color:'#8c928a'});label(`P${p.id+1} DOWN · ${Math.ceil(p.bleed)}s`,p.x+8,p.y-9,'#ffbca0');rect(p.x-9,p.y-6,34,3,'#273d36');rect(p.x-9,p.y-6,34*p.revive/2,3,'#9ce0b6');return;}
  ctx.globalAlpha=p.invulnerable>0&&Math.floor(state.time*12)%2?.55:1;drawCharacter(ctx,p,{species:roster[p.id],time:state.time,color:COLORS[p.id]});ctx.globalAlpha=1;
- if(p.alive){label(mode==='practice'&&p.id===1?'BOT':`P${p.id+1}`,p.x+8,p.y+p.h-42,COLORS[p.id]);if(state.zombie){rect(p.x-3,p.y+p.h-39,22,2,'#243b33');rect(p.x-3,p.y+p.h-39,22*p.hp/p.maxHp,2,'#b0dda3');}}
+ if(p.alive){label(mode==='practice'&&p.id===1?'BOT':`P${p.id+1}`,p.x+8,p.y+p.h-42,COLORS[p.id],Math.max(7,7/camera.scale));if(state.zombie){rect(p.x-3,p.y+p.h-39,22,2,'#243b33');rect(p.x-3,p.y+p.h-39,22*p.hp/p.maxHp,2,'#b0dda3');}}
 }
 function render(){
- ctx.setTransform(2,0,0,2,0,0);ctx.imageSmoothingEnabled=false;ctx.save();if(started&&state.shake)ctx.translate(Math.round((Math.random()-.5)*state.shake),Math.round((Math.random()-.5)*state.shake));drawBackground(ctx,state.map,state.time,state.zombie&&started);drawArena(ctx,state.map);
+ ctx.setTransform(2,0,0,2,0,0);ctx.imageSmoothingEnabled=false;ctx.save();if(started&&state.shake)ctx.translate(Math.round((Math.random()-.5)*state.shake),Math.round((Math.random()-.5)*state.shake));ctx.fillStyle=state.map.theme==='neon'?'#1c213a':state.map.theme==='foundry'?'#3d323d':'#233b3b';ctx.fillRect(0,0,640,360);ctx.scale(camera.scale,camera.scale);ctx.translate(-camera.x,-camera.y);drawBackground(ctx,state.map,state.time,state.zombie&&started);drawArena(ctx,state.map);
  for(const item of state.items){const bob=Math.sin(state.time*3+item.x)*2;ctx.globalAlpha=.18;rect(item.x-12,item.y-12,40,25,WEAPONS[item.type]?.color||'#b4dda7');ctx.globalAlpha=1;
  if(WEAPONS[item.type]){drawWeapon(ctx,item.x+8,item.y+3+bob,item.type,1,{time:state.time,scale:.8});label(WEAPONS[item.type].name,item.x+8,item.y-15+bob,WEAPONS[item.type].color,6);}
  else {rect(item.x,item.y-2,14,12,item.type==='medkit'?'#e9e6ce':'#9aa66d');if(item.type==='medkit'){rect(item.x+5,item.y,4,8,'#c45848');rect(item.x+3,item.y+2,8,4,'#c45848');}else for(let n=0;n<3;n++)rect(item.x+2+n*4,item.y+1,2,6,'#efd092');}
@@ -85,8 +87,8 @@ function render(){
  if(started)state.players.forEach(playerArt);else state.players.slice(0,2).forEach((p,id)=>playerArt({...p,x:id?510:112,y:276,weapon:id?'railgun':'smg',alive:true}));
  for(const b of state.bullets){if(b.kind==='melee'){ctx.strokeStyle='#ffeab3';ctx.lineWidth=2;ctx.beginPath();ctx.arc(b.hitbox.x+16,b.hitbox.y+14,19,-1,1);ctx.stroke();}else if(b.kind==='rocket')drawWeapon(ctx,b.x,b.y,'rocket',Math.sign(b.vx),{scale:.35});else if(b.kind==='flame'){rect(b.x-3,b.y-3,6,6,'#ffc466');rect(b.x,b.y,3,3,'#fff1ae');}else{rect(b.x-(b.kind==='rail'?18:5)*Math.sign(b.vx),b.y,b.kind==='rail'?24:b.kind==='bolt'?12:7,b.kind==='rail'?3:2,b.color||'#ffdf85');rect(b.x,b.y,2,2,'#fff6d7');}}
  for(const g of state.grenades){drawWeapon(ctx,g.x,g.y,'grenade',1,{scale:.65});if(g.fuse<.6&&Math.floor(g.fuse*20)%2)rect(g.x-1,g.y-6,3,3,'#ff7458');}
- for(const p of state.particles){ctx.globalAlpha=Math.min(1,p.life*2);rect(p.x,p.y,Math.round(p.size),Math.round(p.size),p.color);}ctx.globalAlpha=1;drawWater(ctx,state.map,started?state.tide:352,state.time);
- if(started&&!state.zombie&&state.roundTime>22&&state.phase==='playing')label(state.map.theme==='foundry'?'LAVA RISING':'HIGH TIDE INCOMING',320,25,'#ffe5aa',9);
+ for(const p of state.particles){ctx.globalAlpha=Math.min(1,p.life*2);rect(p.x,p.y,Math.round(p.size),Math.round(p.size),p.color);}ctx.globalAlpha=1;drawWater(ctx,state.map,started?state.tide:state.map.height-8,state.time);
+ ctx.restore();ctx.save();if(started&&!state.zombie&&state.roundTime>state.map.tideDelay-3&&state.phase==='playing')label(state.map.theme==='foundry'?'LAVA RISING':'HIGH TIDE INCOMING',320,25,'#ffe5aa',9);
  ctx.globalAlpha=.025;for(let y=0;y<360;y+=3)rect(0,y,640,1,'#172823');ctx.globalAlpha=1;ctx.restore();
  if(!started)return;
  if(state.phase==='countdown'){$('announcement').innerHTML=`${state.timer>.5?Math.ceil(state.timer+.4):'GO!'}${state.zombie?`<small>WAVE ${state.wave} · STAY TOGETHER</small>`:''}`;$('status').textContent=state.zombie?'THE HORDE IS COMING':'GRAB A WEAPON. MAKE A SCENE.';}
@@ -95,9 +97,9 @@ function render(){
  else if(state.phase==='game-over'){$('announcement').innerHTML=`THE HORDE WINS.<small>WAVE ${state.wave} · ${state.teamKills} TEAM KILLS</small>`;$('status').textContent='SURVIVAL OVER';if(state.timer<=0)lobby(`Survived to wave ${state.wave}. ${state.teamKills} team kills. Try again?`);}
  else {$('announcement').innerHTML=state.winner===null?'DOUBLE TROUBLE.<small>DRAW · NO POINTS</small>':`${mode==='practice'&&state.winner===1?'THE BOT':`PLAYER ${state.winner+1}`} ${state.phase==='match-over'?'TAKES THE CROWN!':'WINS!'}<small>${state.phase==='match-over'?'TEN POINTS. ZERO MODESTY.':'ANOTHER ROUND. ANOTHER GRUDGE.'}</small>`;if(state.phase==='match-over'&&state.timer<=0)lobby(`Player ${state.winner+1} wins ${state.scores.join(' – ')}. Run it back?`);}
 }
-export function getSnapshot(){return {started,paused,mode,lobby:{stage:lobbyMenu.stage,ready:[...lobbyMenu.ready],active:lobbyMenu.active,roster:[...roster],options:lobbyMenu.options()},phase:state.phase,mapIndex:state.mapIndex,wave:state.wave,enemies:state.enemies.length,remaining:state.remaining,players:state.players.map(p=>({id:p.id,x:p.x,y:p.y,weapon:p.weapon,ammo:p.ammo,alive:p.alive,hp:p.hp,points:p.points})),audio:{state:audio.context?.state,voices:audio.voices.size,musicVolume:audio.musicVolume,sfxVolume:audio.sfxVolume,enabled:audio.enabled,scene:audio.scene,theme:audio.theme}};}
+export function getSnapshot(){return {started,paused,mode,camera:camera.snapshot(),world:{width:state.map.width,height:state.map.height,size:state.map.size},lobby:{stage:lobbyMenu.stage,ready:[...lobbyMenu.ready],active:lobbyMenu.active,roster:[...roster],options:lobbyMenu.options()},phase:state.phase,mapIndex:state.mapIndex,wave:state.wave,enemies:state.enemies.length,remaining:state.remaining,players:state.players.map(p=>({id:p.id,x:p.x,y:p.y,w:p.w,h:p.h,weapon:p.weapon,ammo:p.ammo,alive:p.alive,hp:p.hp,points:p.points})),audio:{state:audio.context?.state,voices:audio.voices.size,musicVolume:audio.musicVolume,sfxVolume:audio.sfxVolume,enabled:audio.enabled,scene:audio.scene,theme:audio.theme}};}
 // Explicit QA-only hooks let integration tests exercise late-wave menus without waiting through a full match.
 if(new URLSearchParams(location.search).has('qa'))window.billBrawlQA={state:()=>state,audio,nextWave:()=>{state.phase='wave-break';state.timer=12;state.remaining=0;state.enemies=[];for(const p of state.players)p.points=800;upgradeKey='';}};
-function frame(ms){const delta=Math.min(.1,(ms-last)/1000||0);last=ms;controllerStatus();if(started&&!paused){accumulator+=delta;while(accumulator>=1/60){update(state,inputs(),1/60);accumulator-=1/60;}events();}else if(!started)state.time+=delta;render();if(!started)lobbyMenu.draw(state.time);syncHud();syncUpgrades();requestAnimationFrame(frame);}
+function frame(ms){const delta=Math.min(.1,(ms-last)/1000||0);last=ms;controllerStatus();if(started&&!paused){accumulator+=delta;while(accumulator>=1/60){update(state,inputs(),1/60);accumulator-=1/60;}events();}else if(!started)state.time+=delta;if(started&&!paused)camera.update(state.map,state.players,delta,state.round);else if(!started)camera.full(state.map);render();if(!started)lobbyMenu.draw(state.time);syncHud();syncUpgrades();requestAnimationFrame(frame);}
 window.addEventListener('pagehide',()=>audio.setPaused(true));window.addEventListener('pageshow',()=>audio.setPaused(paused));
 syncHud();requestAnimationFrame(frame);

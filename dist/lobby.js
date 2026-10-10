@@ -1,6 +1,6 @@
 import {MAPS,COLORS} from './engine.js';
 import {SPECIES,drawCharacter,drawWeaponIcon} from './sprites.js';
-import {drawBackground,drawArena,drawWater} from './world.js';
+import {drawBackground,drawArena,drawWater,drawMapPreview} from './world.js';
 const $=id=>document.getElementById(id);
 const MODE_NAMES={duel:'CLASSIC BRAWL',practice:'BOT PRACTICE',zombie:'HORDE SURVIVAL'};
 const PERSONALITIES={platypus:'Paddle tail. Big main-character energy.',duck:'The original troublemaker.',pelican:'Big bill. Bigger appetite for chaos.',toucan:'Loud colours. Louder attitude.',puffin:'Small bird. Absolutely no fear.',shoebill:'The stare that starts a fight.'};
@@ -61,7 +61,7 @@ export class ArcadeLobby{
  }
  show(stage,{focus=true}={}){this.stage=stage;this.errorUntil=0;document.querySelectorAll('[data-stage]').forEach(n=>n.classList.toggle('hidden',n.dataset.stage!==stage));this.sync();this.cue();if(focus){const h=$('stage-'+stage).querySelector('h2');h.tabIndex=-1;h.focus({preventScroll:true});}}
  reset(caption){this.ready.fill(false);this.active=0;this.crewUI();$('menu-caption').textContent=caption;this.show('mode',{focus:false});}
- arenaUI(){const m=MAPS[this.arena];$('arena-name').textContent=m.name;$('arena-tag').textContent=m.tag;$('arena-description').textContent=ARENA_DESCRIPTIONS[this.arena];$('arena-counter').textContent=`0${this.arena+1} / 07`;$('arena-preview').setAttribute('aria-label',m.name+' preview');$('arena-dots').querySelectorAll('button').forEach(b=>{const selected=Number(b.dataset.arena)===this.arena;b.classList.toggle('selected',selected);b.setAttribute('aria-pressed',String(selected));});}
+ arenaUI(){const m=MAPS[this.arena];$('arena-name').textContent=m.name;$('arena-tag').textContent=m.size+' · '+m.width+' × '+m.height+' · '+m.tag;$('arena-description').textContent=ARENA_DESCRIPTIONS[this.arena];$('arena-counter').textContent=`0${this.arena+1} / 07`;$('arena-preview').setAttribute('aria-label',m.name+' preview');$('arena-dots').querySelectorAll('button').forEach(b=>{const selected=Number(b.dataset.arena)===this.arena;b.classList.toggle('selected',selected);b.setAttribute('aria-pressed',String(selected));});}
  chooseArena(id){this.arena=wrap(id,MAPS.length);this.arenaUI();this.preview();this.cue();}
  launch(){if(!this.allReady()){this.show('crew');return;}const needed=Math.max(0,this.options().players-2);if(this.devices<needed){this.notice(`Connect ${needed} controller${needed===1?'':'s'} for players 3${needed>1?'–4':''}.`);return;}this.onStart(this.options());}
  confirm(){if(this.stage==='mode')this.show('crew');else if(this.stage==='crew'){if(this.allReady())this.show('arena');else this.toggleReady(this.active,true);}else this.launch();}
@@ -93,12 +93,12 @@ export class ArcadeLobby{
  speciesIcon(canvas,name){const c=canvas.getContext('2d');c.setTransform(2,0,0,2,0,0);c.clearRect(0,0,72,43);c.imageSmoothingEnabled=false;drawCharacter(c,{id:this.active,x:25,y:17,w:16,h:22,dir:1,vx:0,alive:true},{species:name,color:COLORS[this.active]});}
  draw(time){
   this.time=time;if(this.errorUntil&&this.errorUntil<time){this.errorUntil=0;this.sync();}const t=this.reducedMotion?0:time;
-  if(this.stage==='mode')document.querySelectorAll('.mode-card').forEach((card,index)=>{const c=card.querySelector('canvas').getContext('2d');c.setTransform(.7,0,0,.7,0,0);c.imageSmoothingEnabled=false;const map=MAPS[[0,1,4][index]];drawBackground(c,map,t,index===2);c.fillStyle='#142f36';c.fillRect(0,318,640,42);c.fillStyle='#b4ba8c';c.fillRect(0,315,640,4);c.save();c.translate(320,318);c.scale(2.35,2.35);c.translate(-320,-318);const p=(id,x,dir,weapon)=>({id,x,y:296+Math.sin(t*2+id)*1.3,w:16,h:22,dir,vx:28,alive:true,weapon,flash:Math.sin(t*4+id)> .95?.1:0});
+  if(this.stage==='mode')document.querySelectorAll('.mode-card').forEach((card,index)=>{const c=card.querySelector('canvas').getContext('2d');c.setTransform(.7,0,0,.7,0,0);c.imageSmoothingEnabled=false;const map={...MAPS[[0,1,4][index]],width:640,height:360};drawBackground(c,map,t,index===2);c.fillStyle='#142f36';c.fillRect(0,318,640,42);c.fillStyle='#b4ba8c';c.fillRect(0,315,640,4);c.save();c.translate(320,318);c.scale(2.35,2.35);c.translate(-320,-318);const p=(id,x,dir,weapon)=>({id,x,y:296+Math.sin(t*2+id)*1.3,w:16,h:22,dir,vx:28,alive:true,weapon,flash:Math.sin(t*4+id)> .95?.1:0});
    drawCharacter(c,p(0,269,1,index===2?'shotgun':'smg'),{species:'platypus',time:t,color:COLORS[0]});drawCharacter(c,p(1,355,-1,index===1?'railgun':null),{species:index===1?'shoebill':index===2?'duck':'toucan',time:t,color:COLORS[1],zombie:index===2});if(index===2)drawCharacter(c,p(2,395,-1,null),{species:'puffin',time:t,zombie:true});c.restore();});
   else if(this.stage==='crew')$('roster').querySelectorAll('.crew-portrait').forEach((canvas,id)=>{const c=canvas.getContext('2d');c.setTransform(2,0,0,2,0,0);c.imageSmoothingEnabled=false;c.clearRect(0,0,200,140);const ready=this.ready[id],bot=this.mode==='practice'&&id===1;
    const glow=c.createRadialGradient(100,100,0,100,100,74);glow.addColorStop(0,COLORS[id]+'33');glow.addColorStop(1,COLORS[id]+'00');c.fillStyle=glow;c.fillRect(0,0,200,140);c.fillStyle='#142826';c.fillRect(39,124,122,6);c.fillStyle=ready?COLORS[id]:'#537364';c.fillRect(32,121,136,3);c.fillStyle='#385349';c.fillRect(39,130,122,3);c.save();c.translate(100,121+(ready?0:Math.sin(t*2.5+id)*1.4));c.scale(2.75,2.75);drawCharacter(c,{id,x:-8,y:-22,w:16,h:22,dir:1,vx:ready?0:35,alive:true,chirp:this.chirpUntil[id]>time?.3:0,weapon:bot?'pistol':null},{species:this.roster[id],time:t,color:COLORS[id]});c.restore();
    if(ready&&!this.reducedMotion){c.fillStyle=COLORS[id];for(let n=0;n<5;n++){const x=45+n*28,y=95-((t*14+n*27)%85);c.globalAlpha=.35;c.fillRect(x,y,2,2);}c.globalAlpha=1;}
   });
-  else if(this.stage==='arena'){const c=$('arena-preview').getContext('2d'),map=MAPS[this.arena];c.imageSmoothingEnabled=false;drawBackground(c,map,t,this.mode==='zombie');drawArena(c,map);drawWater(c,map,352,t);map.items.forEach(([x,y,type])=>drawWeaponIcon(c,x+8,y+3+Math.sin(t*2+x),type,.65));}
+  else if(this.stage==='arena'){const c=$('arena-preview').getContext('2d'),map=MAPS[this.arena];c.imageSmoothingEnabled=false;drawMapPreview(c,map,t,this.mode==='zombie');c.save();c.scale(640/map.width,360/map.height);map.items.forEach(([x,y,type])=>drawWeaponIcon(c,x+8,y+3+Math.sin(t*2+x),type,.65));c.restore();}
  }
 }
