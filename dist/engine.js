@@ -1,5 +1,5 @@
 import {MAPS,WEAPONS,mapForMode} from './content.js';
-import {collisionTerrain,toggleDoor,breakTerrain,blastTerrain,addField,updateTerrain,footing} from './terrain.js';
+import {collisionTerrain,terrainForMap,toggleDoor,breakTerrain,blastTerrain,addField,updateTerrain,footing} from './terrain.js';
 export {MAPS,WEAPONS};
 export const WIDTH=640,HEIGHT=360,COLORS=['#ffcc64','#8eb6e6','#e98b89','#99c998'];
 export const JUMP_SPEED=380;
@@ -33,7 +33,9 @@ function dropWeapon(s,p,throwing=false){if(!p.weapon)return;s.items.push(makeIte
 export function killPlayer(s,p){if(!p.alive)return;p.alive=false;p.hp=0;p.vy=-130;p.vx=-p.dir*55;p.downed=s.zombie&&s.count>1;p.bleed=18;p.revive=0;particles(s,p.x+8,p.y+8,COLORS[p.id],20);emit(s,'death',{id:p.id,downed:p.downed});s.shake=Math.max(s.shake,4);if(!p.downed)dropWeapon(s,p);}
 function hurt(s,p,damage,deaths){if(!p.alive||p.invulnerable>0)return;if(!s.zombie){deaths.add(p);return;}p.hp-=damage;p.invulnerable=.6;p.vx=-p.dir*100;p.vy=-90;emit(s,'hurt',{id:p.id});particles(s,p.x+8,p.y+8,'#e99580',6);if(p.hp<=0)deaths.add(p);}
 function hitEnemy(s,z,damage,owner){if(!z.alive)return;z.hp-=damage;z.flash=.1;z.vx+=z.x>(owner?.x??z.x)?45:-45;emit(s,'zombie-hit');if(z.hp>0)return;z.alive=false;s.teamKills++;if(owner){owner.points+=100;owner.kills++;}particles(s,z.x+8,z.y+9,z.kind==='brute'?'#ccaf82':'#a2b38b',16);emit(s,'zombie-death');if(Math.random()<.14)s.items.push(makeItem(z.x,z.y,'medkit'));else if(Math.random()<.25)s.items.push(makeItem(z.x,z.y,'ammo'));}
-function grab(s,p){if(toggleDoor(s,p))return;if(p.weapon){dropWeapon(s,p,true);emit(s,'throw');return;}let nearest=null,d=38;for(const i of s.items){if(!WEAPONS[i.type])continue;const next=Math.hypot(i.x+8-p.x-8,i.y+4-p.y-11);if(i.lock<=0&&next<d){nearest=i;d=next;}}if(nearest){p.weapon=nearest.type;p.ammo=nearest.ammo;s.items.splice(s.items.indexOf(nearest),1);emit(s,'pickup',{id:p.id,weapon:p.weapon});}}
+function grab(s,p){let nearest=null,d=38;for(const i of s.items){if(!WEAPONS[i.type])continue;const next=Math.hypot(i.x+8-p.x-8,i.y+4-p.y-11);if(i.lock<=0&&next<d){nearest=i;d=next;}}
+ // An unarmed player can collect nearby loot instead of repeatedly toggling a doorway.
+ if(toggleDoor(s,p,!p.weapon&&nearest?d:43))return;if(p.weapon){dropWeapon(s,p,true);emit(s,'throw');return;}if(nearest){p.weapon=nearest.type;p.ammo=nearest.ammo;s.items.splice(s.items.indexOf(nearest),1);emit(s,'pickup',{id:p.id,weapon:p.weapon});}}
 function spawnShot(s,p,weapon,extra={}){
  const def=WEAPONS[weapon],count=def.pellets||1;
  for(let n=0;n<count;n++){
@@ -70,7 +72,7 @@ function fire(s,p,deaths,charge=1){
  s.shake=Math.max(s.shake,['shotgun','blunderbuss','rocket','cluster'].includes(p.weapon)?2:1);
 }
 export function moveBody(p,platforms,dt,drop=false,width=WIDTH){p.x+=p.vx*dt;for(const b of platforms)if(!b.oneWay&&overlap(p,b)){if(p.vx>0)p.x=b.x-p.w;else if(p.vx<0)p.x=b.x+b.w;p.vx=0;}p.x=clamp(p.x,0,width-p.w);const bottom=p.y+p.h;p.y+=p.vy*dt;p.ground=false;for(const b of platforms){if(!overlap(p,b))continue;if(p.vy>=0&&bottom<=b.y+2&&!(b.oneWay&&drop)){p.y=b.y-p.h;p.vy=0;p.ground=true;}else if(!b.oneWay&&p.vy<0){p.y=b.y+b.h;p.vy=0;}}}
-export function buildNavigation(map,maxRise=Math.floor(JUMP_SPEED*JUMP_SPEED/1700-8)){const nodes=map.platforms.filter(b=>!b.destroyed).map((p,id)=>({...p,id}));const edges=nodes.map(()=>[]);for(const a of nodes)for(const b of nodes){if(a===b)continue;const gap=Math.max(0,b.x-(a.x+a.w),a.x-(b.x+b.w)),rise=a.y-b.y;if(rise<=maxRise&&rise>=-200&&gap<=(rise>0?115:165)&&!(gap>65&&rise>45))edges[a.id].push(b.id);}return{nodes,edges};}
+export function buildNavigation(map,maxRise=Math.floor(JUMP_SPEED*JUMP_SPEED/1700-8)){const nodes=terrainForMap(map).filter(b=>b.type!=='door').map((p,id)=>({...p,id}));const edges=nodes.map(()=>[]);for(const a of nodes)for(const b of nodes){if(a===b)continue;const gap=Math.max(0,b.x-(a.x+a.w),a.x-(b.x+b.w)),rise=a.y-b.y;if(rise<=maxRise&&rise>=-200&&gap<=(rise>0?115:165)&&!(gap>65&&rise>45))edges[a.id].push(b.id);}return{nodes,edges};}
 function platformUnder(s,entity){let best=null,d=Infinity;const feet=entity.y+(entity.h||9),x=entity.x+(entity.w||16)/2;for(const n of s.navigation.nodes){if(x>=n.x-3&&x<=n.x+n.w+3&&n.y>=feet-4&&n.y-feet<d){best=n;d=n.y-feet;}}return best;}
 function path(s,from,to){if(!from||!to||from.id===to.id)return[];const queue=[from.id],prev=new Map([[from.id,null]]);for(let k=0;k<queue.length;k++){const id=queue[k];if(id===to.id)break;for(const next of s.navigation.edges[id])if(!prev.has(next)){prev.set(next,id);queue.push(next);}}if(!prev.has(to.id))return[];const route=[];for(let id=to.id;id!==from.id;id=prev.get(id))route.unshift(s.navigation.nodes[id]);return route;}
 function visible(s,a,b){const x=a.x+8,y=a.y+10,tx=b.x+8,ty=b.y+10;return!collisionTerrain(s).some(w=>segmentRect(x,y,tx,ty,w)!==null);}
@@ -132,7 +134,7 @@ export function movePlayer(s,p,i,dt){
  const old=p.previous,h=i.down?14:22;if(h!==p.h){const next={...p,y:p.y+p.h-h,h};if(h<p.h||!collisionTerrain(s).some(b=>!b.oneWay&&overlap(next,b))){p.y=next.y;p.h=h;}}
  const move=Number(i.right)-Number(i.left);if(move&&!i.strafe)p.dir=move;const floor=footing(s,p),def=WEAPONS[p.weapon],slow=p.frozen>0?.25:1;const desired=move*(i.down?90:160)*p.speedScale*slow*(i.fire?(def?.moveScale||1):1),acc=p.ground?1700*floor.grip:850;p.vx+=clamp(desired-p.vx,-acc*dt,acc*dt);
  p.coyote=p.ground?.09:Math.max(0,p.coyote-dt);p.buffer=i.jump&&!old.jump?.1:Math.max(0,p.buffer-dt);let dropping=false;
- if(p.buffer>0&&p.coyote>0){if(i.down&&s.map.platforms.some(b=>b.oneWay&&Math.abs(p.y+p.h-b.y)<3&&p.x+p.w>b.x&&p.x<b.x+b.w)){p.y+=3;p.vy=70;dropping=true;}else{p.vy=-JUMP_SPEED;emit(s,'jump',{id:p.id});}p.buffer=0;p.coyote=0;p.ground=false;}
+ if(p.buffer>0&&p.coyote>0){if(i.down&&collisionTerrain(s).some(b=>b.oneWay&&Math.abs(p.y+p.h-b.y)<3&&p.x+p.w>b.x&&p.x<b.x+b.w)){p.y+=3;p.vy=70;dropping=true;}else{p.vy=-JUMP_SPEED;emit(s,'jump',{id:p.id});}p.buffer=0;p.coyote=0;p.ground=false;}
  if(!i.jump&&old.jump&&p.vy<-130)p.vy=-130;p.vy=Math.min(i.jump&&p.vy>0?115:480,p.vy+850*dt);moveBody(p,collisionTerrain(s),dt,dropping,s.map.width);if(p.ground&&floor.belt){const before=p.x;p.x=clamp(p.x+floor.belt*dt,0,s.map.width-p.w);if(collisionTerrain(s).some(b=>!b.oneWay&&overlap(p,b)))p.x=before;}
  p.previous={...i};
 }

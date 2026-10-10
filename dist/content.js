@@ -64,7 +64,7 @@ const ground=(w,h,material='stone')=>surface(0,h-40,w,40,material,false);
 const crate=(x,y,material='wood')=>({type:'crate',x,y,w:26,h:26,material,hp:material==='metal'?150:65,solid:true});
 const barrel=(x,y)=>({type:'barrel',x,y,w:20,h:28,hp:32,solid:true,explosive:true});
 const door=(x,y)=>({type:'door',x,y,w:10,h:48,hp:85,solid:true,material:'wood',open:false});
-const tree=(x,floor,height=96,snow=false)=>({type:'tree',x,y:floor-height,w:20,h:height,hp:180,solid:true,material:'wood',snow});
+const tree=(x,floor,height=96,snow=false)=>({type:'tree',x,y:floor-height,w:20,h:height,hp:180,solid:false,material:'wood',snow});
 const hazard=(type,x,y,w,h=8,extra={})=>({type,x,y,w,h,...extra});
 function arena(name,theme,width,description,platforms,objects=[],hazards=[],decorations=[]){
  const height=width*9/16,floor=height-40,keys=Object.keys(WEAPONS);
@@ -151,7 +151,26 @@ const renovated=originalMaps.map((m,index)=>{
 
  return {...m,description:originalDescriptions[index],platforms,objects,hazards,decorations:index===2?[{type:'pipe',x:220,y:40,w:24,h:150}]:[],items};
 });
-export const MAPS=[...renovated,...newMaps].map(m=>({...m,platforms:m.platforms.map(b=>({...b,...(b.material==='glass'?{hp:b.hp||24}:{}),...(!b.oneWay&&b.h<32&&b.material==='wood'?{hp:80}:{})}))}));
+// Replace freestanding doors with two-ended chambers underneath existing terraces.
+// Their balcony roofs provide a second route; ground-floor doors protect a weapon stash.
+function furnishRooms(m){
+ if(!m.objects.some(o=>o.type==='door'))return m;
+ const floor=m.height-40,rooms=[],objects=m.objects.filter(o=>o.type!=='door'),items=[...m.items],platforms=[...m.platforms];
+ const roofs=platforms.filter(b=>b.oneWay&&b.w>=110&&b.y>=floor-65&&b.y<=floor-45).slice(0,2);
+ for(const [n,roof] of roofs.entries()){
+  const x=roof.x+8,w=roof.w-16,y=roof.y+roof.h,h=floor-y;
+  const room={x,y,w,h,material:roof.material,theme:m.theme,stash:n?'tesla':'shotgun'};rooms.push(room);
+  for(const dx of [x,x+w-10]){
+   objects.push({...door(dx,floor-48),room:rooms.length-1});
+   if(y<floor-48)platforms.push(surface(dx,y,10,floor-48-y,roof.material,false));
+  }
+  // Stash is physically inside the chamber, between both entrances.
+  items.push([x+w/2-8,floor-22,room.stash]);
+ }
+ const doors=objects.filter(o=>o.type==='door');
+ return {...m,rooms,items,platforms,objects:objects.filter(o=>o.type!=='crate'&&o.type!=='barrel'||!doors.some(d=>o.x<d.x+d.w+2&&o.x+o.w>d.x-2&&o.y<floor&&o.y+o.h>d.y))};
+}
+export const MAPS=[...renovated,...newMaps].map(furnishRooms).map(m=>({...m,platforms:m.platforms.map(b=>({...b,...(b.material==='glass'?{hp:b.hp||24}:{}),...(!b.oneWay&&b.h<32&&b.material==='wood'?{hp:80}:{})}))}));
 export function mapForMode(index,zombie){
  const m=MAPS[index],floor=m.height-40;
  // Arena terrain is cloned per round: destruction never mutates the shared catalog.

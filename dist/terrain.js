@@ -1,14 +1,22 @@
 // Shared terrain rules are independent of Canvas and can run on the match server.
 const overlap=(a,b)=>a.x<b.x+b.w&&a.x+a.w>b.x&&a.y<b.y+b.h&&a.y+a.h>b.y;
 const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
-export function collisionTerrain(s){return s._terrainCache??= [...s.map.platforms.filter(b=>!b.destroyed),...(s.map.objects||[]).filter(o=>o.solid&&!o.destroyed&&!(o.type==='door'&&o.open))];}
-export function toggleDoor(s,p){
- const doors=(s.map.objects||[]).filter(o=>o.type==='door'&&!o.destroyed&&Math.hypot(o.x+o.w/2-p.x-8,o.y+o.h/2-p.y-p.h/2)<43);
+// Branches and canopy are one-way floors. The decorative trunk never blocks a body.
+export function treePlatforms(o){
+ const floor=o.y+o.h,top=o.y-20,levels=[top];
+ for(let y=floor-50;y>top+28;y-=50)levels.push(y);
+ return levels.map((y,n)=>({x:o.x+o.w/2-(n?24:36),y,w:n?48:72,h:8,oneWay:true,material:o.snow?'ice':'leaf',hp:o.hp,source:o}));
+}
+export function terrainForMap(map){return [...map.platforms.filter(b=>!b.destroyed),...(map.objects||[]).flatMap(o=>o.destroyed?[]:o.type==='tree'?treePlatforms(o):o.solid&&!(o.type==='door'&&o.open)?[o]:[])];}
+export function collisionTerrain(s){return s._terrainCache??=terrainForMap(s.map);}
+export function toggleDoor(s,p,maxDistance=43){
+ const doors=(s.map.objects||[]).filter(o=>o.type==='door'&&!o.destroyed&&Math.hypot(o.x+o.w/2-p.x-8,o.y+o.h/2-p.y-p.h/2)<maxDistance);
  const door=doors.sort((a,b)=>Math.abs(a.x-p.x)-Math.abs(b.x-p.x))[0];if(!door)return false;
  if(door.open&&[...s.players,...s.enemies].some(a=>a.alive&&overlap(a,door)))return true;
  door.open=!door.open;s._terrainCache=null;s.events.push({type:'door',x:door.x});return true;
 }
 export function breakTerrain(s,b,damage,owner){
+ b=b.source||b;
  if(b.destroyed||!Number.isFinite(b.hp))return false;
  b.hp-=damage;if(b.hp>0){b.flash=.12;return false;}
  b.destroyed=true;s._terrainCache=null;s.terrainDirty=true;s.events.push({type:'break',x:b.x,material:b.material});

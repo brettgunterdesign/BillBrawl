@@ -45,3 +45,13 @@ This is a sampled movement audit, not an exhaustive proof over every possible in
 ## Verification result
 
 All 126 arena/configuration audits passed. Both rooftop jump regressions, the jump/flutter check, and the audit's sealed-courtyard and crouch/door fixtures passed. The standard gameplay and online/prediction suites passed (60 checks), as did the complete local-game and four-browser online integration suites. The browser check visibly places both rooftop players on their first balconies after a normal held jump.
+
+## Furnished doorways and pass-through trees
+
+Doors now frame both ends of furnished chambers under existing balconies, with weapon stashes inside. Players can open either door with grab, break it, or use the balcony roof as an alternate route. Unarmed players collect closer equipment before toggling a farther doorway; armed players can still open doors without throwing their weapon.
+
+Tree trunks are decorative and passable. Each tree has a wide one-way canopy and lower branches spaced 50 pixels apart. These surfaces share the tree's destruction state, support down+jump dropping, and participate in bot navigation and online movement prediction. The rendered foliage's bright upper edges match its landing surfaces. Lava, acid, frozen surfaces, and persistent weapon fields now have separate visual treatments; hazard collision bounds and damage rules are unchanged.
+
+`npm run test:world:browser` checks room entry, stash pickup, exit, animated acid, and distinct hazard colors in Chromium. The world unit tests cover trunk traversal, branch landing/drop, shared destruction, room completeness, and equipment priority near doors. The prediction suite checks authoritative/client agreement on branch landing and dropping.
+
+After the room/tree changes, all 126 arena/configuration audits passed again, including both rooftop jump checks. The gameplay/world unit suites passed (56 checks), and the server/prediction suites passed (9 checks). The dedicated world browser check and four-browser online integration check passed.

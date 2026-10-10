@@ -12,3 +12,12 @@ test('prediction cannot consume ammo, grab equipment, damage terrain or score el
  const s=make('stone'),p=s.players[0];p.weapon='rocket';p.ammo=5;s.map.objects=[{type:'crate',x:200,y:294,w:26,h:26,hp:65,solid:true}];s.items=[{x:100,y:298,w:16,h:9,type:'pistol'}];const before=JSON.stringify([s.scores,s.map.objects,s.items]);
  for(let n=0;n<30;n++)predictPlayer(s,p,{fire:true,grab:true,chirp:true});assert.equal(p.ammo,5);assert.equal(s.bullets.length,0);assert.equal(JSON.stringify([s.scores,s.map.objects,s.items]),before);
 });
+test('tree branch landing and dropping match the authoritative online simulation',()=>{
+ const server=make('stone');server.map.objects=[{type:'tree',x:100,y:220,w:20,h:100,hp:180,solid:false,material:'wood'}];const client=structuredClone(server);
+ let onBranch=false,returned=false;for(let tick=0;tick<180;tick++){
+  const input={jump:tick<115||tick===125,down:tick===125};update(server,[input],1/60);predictPlayer(client,client.players[0],input);
+  for(const key of ['x','y','vx','vy','h','ground'])assert.equal(client.players[0][key],server.players[0][key],`${key} tick ${tick}`);
+  onBranch ||=server.players[0].ground&&server.players[0].y+server.players[0].h===270;
+  if(tick>125)returned ||=server.players[0].ground&&server.players[0].y+server.players[0].h===320;
+ }assert.ok(onBranch&&returned);
+});

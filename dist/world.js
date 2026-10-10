@@ -1,4 +1,4 @@
-import {drawMaterial,drawDecorations,drawObjects} from './terrain-art.js';
+import {drawMaterial,drawDecorations,drawObjects,drawRooms,drawLiquid} from './terrain-art.js';
 const palettes={dock:['#edcfa7','#d4ae87','#789f8b'],roof:['#dda58c','#a68e99','#5e6679'],pump:['#aab4aa','#758e87','#48695f'],ruins:['#d3d9af','#91b487','#456950'],neon:['#1c213a','#30334d','#27324c'],snow:['#dcebee','#a9cddc','#6a8b9e'],foundry:['#3d323d','#60433f','#45373a']};
 const rect=(ctx,x,y,w,h,c)=>{ctx.fillStyle=c;ctx.fillRect(Math.round(x),Math.round(y),w,h);};
 function cloud(ctx,x,y,w,c){rect(ctx,x,y,w,8,c);rect(ctx,x+10,y-5,w-20,6,c);rect(ctx,x+23,y-9,w-46,4,c);}
@@ -29,9 +29,10 @@ export function drawBackground(ctx,map,time=0,zombie=false){
 
 }
 export function drawArena(ctx,map,time=0){
+ drawRooms(ctx,map,time);
  drawDecorations(ctx,map,time);
  for(const b of map.platforms)drawMaterial(ctx,b,time);
  drawObjects(ctx,map,time);
 }
-export function drawWater(ctx,map,tide,time=0){const lava=map.theme==='foundry',width=map.width||640,height=map.height||360;rect(ctx,0,tide,width,Math.max(0,height-tide),lava?'#9e543a':'#477c77');rect(ctx,0,tide,width,2,lava?'#ffb960':'#90c5b3');for(let n=0;n<Math.ceil(width/23);n++)rect(ctx,(n*27+time*12)%(width+20)-15,tide+4+n%3*5,14,1,lava?'#ef8f50':'#76aaa0');}
+export function drawWater(ctx,map,tide,time=0){const lava=map.theme==='foundry',width=map.width||640,height=map.height||360;if(lava){drawLiquid(ctx,{type:'lava',x:0,y:tide,w:width,h:Math.max(8,height-tide)},time);return;}rect(ctx,0,tide,width,Math.max(0,height-tide),'#477c77');rect(ctx,0,tide,width,2,lava?'#ffb960':'#90c5b3');for(let n=0;n<Math.ceil(width/23);n++)rect(ctx,(n*27+time*12)%(width+20)-15,tide+4+n%3*5,14,1,lava?'#ef8f50':'#76aaa0');}
 export function drawMapPreview(ctx,map,time=0,zombie=false){ctx.save();ctx.scale(640/map.width,360/map.height);drawBackground(ctx,map,time,zombie);drawArena(ctx,map,time);drawWater(ctx,map,map.height-8,time);ctx.restore();}
