@@ -100,5 +100,10 @@ try{
   assert.ok(await page.evaluate(()=>window.weaponAudioPeak)>.001,weapon.key+' silent firing effect');assert.ok((await snapshot()).audio.voices<=64);
  }
  await page.evaluate(()=>clearInterval(window.weaponAudioTimer));
+ // Rooftop Rumble: a real keyboard jump escapes both floor spawn alcoves.
+ await quit();await setup({mode:'duel',players:2,arena:1});await page.locator('#start').click();await page.waitForTimeout(2000);
+ await page.keyboard.down('KeyW');await page.keyboard.down('ArrowUp');await page.waitForTimeout(950);
+ await page.keyboard.up('KeyW');await page.keyboard.up('ArrowUp');await page.waitForTimeout(100);
+ const escaped=(await snapshot()).players;assert.ok(escaped.every(p=>p.alive&&p.y+p.h<=440),JSON.stringify(escaped));await shot('rooftop-spawn-escape');
  assert.deepEqual(errors,[]);console.log('Browser checks passed: viewport-filling game with no surrounding page; compact controls overlay and pause/resume; three-stage lobby; mouse, keyboard, and gamepad selection/ready/back; four-player gating; fullscreen; all mobile stages; PVP combat; active bot and constant music tempo across 42 rounds; co-op upgrades; audio controls; controller disconnect; huge-world preview; adaptive camera zoom/framing; simultaneous-death rendering; all 21 arena previews; 22 unique weapon icons and audible effects.');
 }catch(e){console.error('Browser errors:',errors);console.error('State:',await snapshot());await shot('arcade-qa-failure');throw e;}finally{await browser.close();server.close();}
