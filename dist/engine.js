@@ -30,7 +30,7 @@ function spawnShot(s,p,weapon,extra={}){
  const def=WEAPONS[weapon],count=def.pellets||1;
  for(let n=0;n<count;n++){
   const spread=count===1?0:(n/(count-1)*2-1)*def.spread;
-  s.bullets.push({x:p.x+8+p.dir*6,y:p.y+9,vx:p.dir*def.speed,vy:(def.launchY||0)+spread*def.speed,
+  s.bullets.push({id:s.nextEntity++,x:p.x+8+p.dir*6,y:p.y+9,vx:p.dir*def.speed,vy:(def.launchY||0)+spread*def.speed,
    owner:p.id,weapon,kind:def.kind==='burst'?'bullet':def.kind,damage:def.damage*p.damageScale,life:def.life||1.4,age:0,
    bounces:def.bounces||0,hitIds:[],color:def.color,gravity:def.gravity||0,remaining:def.range||1000,radius:def.radius,...extra});
  }
@@ -42,7 +42,7 @@ function fire(s,p,deaths,charge=1){
  const ammo=def.kind==='burst'?Math.min(3,p.ammo):1;if(p.ammo>0)p.ammo-=ammo;
  p.flash=.1;emit(s,'shot',{weapon:p.weapon,id:p.id});
  if(def.kind==='grenade'||def.kind==='cluster'){
-  s.grenades.push({x:p.x+8,y:p.y+6,vx:p.dir*def.throwSpeed+p.vx*.4,vy:def.throwY,fuse:def.fuse,owner:p.id,w:6,h:6,damage:def.damage*p.damageScale,radius:def.radius,cluster:def.kind==='cluster',weapon:p.weapon});
+  s.grenades.push({id:s.nextEntity++,x:p.x+8,y:p.y+6,vx:p.dir*def.throwSpeed+p.vx*.4,vy:def.throwY,fuse:def.fuse,owner:p.id,w:6,h:6,damage:def.damage*p.damageScale,radius:def.radius,cluster:def.kind==='cluster',weapon:p.weapon});
  }else if(def.kind==='mine'){
   if(s.traps.length>=16)s.traps.shift();s.traps.push({x:p.x+8+p.dir*16,y:p.y+10,w:14,h:6,vy:0,owner:p.id,life:def.life,arm:.7,ground:false,damage:def.damage*p.damageScale,radius:def.radius});
  }else if(def.kind==='tesla'){
@@ -53,7 +53,7 @@ function fire(s,p,deaths,charge=1){
   }
   if(points.length===1)points.push({x:p.x+8+p.dir*def.range,y:p.y+8});s.effects.push({kind:'arc',points,color:def.color,life:.22});
  }else if(def.kind==='melee'){
-  s.bullets.push({x:p.x+8,y:p.y+10,vx:0,vy:0,owner:p.id,kind:'melee',hitbox:{x:p.dir>0?p.x+p.w:p.x-def.reach,y:p.y-3,w:def.reach,h:p.h+6},damage:def.damage*p.damageScale,life:.08,age:0,hitIds:[],terrainHits:[]});
+  s.bullets.push({id:s.nextEntity++,x:p.x+8,y:p.y+10,vx:0,vy:0,owner:p.id,kind:'melee',hitbox:{x:p.dir>0?p.x+p.w:p.x-def.reach,y:p.y-3,w:def.reach,h:p.h+6},damage:def.damage*p.damageScale,life:.08,age:0,hitIds:[],terrainHits:[]});
  }else{
   spawnShot(s,p,p.weapon,def.kind==='plasma'?{damage:def.damage*p.damageScale*(.4+charge*.8),radius:26+def.radius*charge,charged:charge}:{});
   if(def.kind==='burst')for(let n=1;n<ammo;n++)s.salvos.push({owner:p.id,weapon:p.weapon,delay:n*.075});
@@ -102,12 +102,21 @@ export function buyUpgrade(s,id,type){const p=s.players[id],level=s.upgradeLevel
 export function upgradeCost(s,id,type){return(type==='damage'?350:250)+(s.upgradeLevels[id]?.[type]||0)*(type==='damage'?150:100);}
 function spawnEnemy(s){const living=s.players.filter(p=>p.alive);if(!living.length)return;const kind=s.wave>=5&&s.remaining%6===0?'brute':s.wave>=3&&s.remaining%3===0?'runner':'shambler',left=s.remaining%2===0;const hp=(38+s.wave*10)*(kind==='brute'?3:1);const z={id:s.nextEntity++,x:left?Math.max(8,Math.min(...living.map(p=>p.x))-280):Math.min(s.map.width-24,Math.max(...living.map(p=>p.x))+280),y:s.map.height-75,w:16,h:22,vx:0,vy:0,dir:left?1:-1,alive:true,ground:false,coyote:0,buffer:0,previous:emptyInput(),brain:{jumpHeld:0,jumpRest:0,lastX:0,stuck:0},kind,hp,maxHp:hp,speed:Math.min(115,40+s.wave*2)*(kind==='runner'?1.5:kind==='brute'?.7:1),attack:0,flash:0,species:['duck','platypus','shoebill','puffin'][s.remaining%4]};s.enemies.push(z);s.remaining--;emit(s,'zombie-spawn',{kind});}
 function animate(s,dt){s.time+=dt;s.shake=Math.max(0,s.shake-dt*14);for(const p of s.particles){p.life-=dt;p.x+=p.vx*dt;p.y+=p.vy*dt;p.vy+=500*dt;}s.particles=s.particles.filter(p=>p.life>0);}
-function controlPlayer(s,p,i,dt,deaths){
+export function movePlayer(s,p,i,dt){
  const old=p.previous,h=i.down?14:22;if(h!==p.h){const next={...p,y:p.y+p.h-h,h};if(h<p.h||!collisionTerrain(s).some(b=>!b.oneWay&&overlap(next,b))){p.y=next.y;p.h=h;}}
  const move=Number(i.right)-Number(i.left);if(move&&!i.strafe)p.dir=move;const floor=footing(s,p),def=WEAPONS[p.weapon],slow=p.frozen>0?.25:1;const desired=move*(i.down?90:160)*p.speedScale*slow*(i.fire?(def?.moveScale||1):1),acc=p.ground?1700*floor.grip:850;p.vx+=clamp(desired-p.vx,-acc*dt,acc*dt);
  p.coyote=p.ground?.09:Math.max(0,p.coyote-dt);p.buffer=i.jump&&!old.jump?.1:Math.max(0,p.buffer-dt);let dropping=false;
  if(p.buffer>0&&p.coyote>0){if(i.down&&s.map.platforms.some(b=>b.oneWay&&Math.abs(p.y+p.h-b.y)<3&&p.x+p.w>b.x&&p.x<b.x+b.w)){p.y+=3;p.vy=70;dropping=true;}else{p.vy=-325;emit(s,'jump',{id:p.id});}p.buffer=0;p.coyote=0;p.ground=false;}
  if(!i.jump&&old.jump&&p.vy<-130)p.vy=-130;p.vy=Math.min(i.jump&&p.vy>0?115:480,p.vy+850*dt);moveBody(p,collisionTerrain(s),dt,dropping,s.map.width);if(p.ground&&floor.belt){const before=p.x;p.x=clamp(p.x+floor.belt*dt,0,s.map.width-p.w);if(collisionTerrain(s).some(b=>!b.oneWay&&overlap(p,b)))p.x=before;}
+ p.previous={...i};
+}
+export function predictPlayer(s,p,i,dt=1/60){
+ if(s.phase!=='playing'||!p.alive)return;
+ p.frozen=Math.max(0,(p.frozen||0)-dt);p.springCooldown=Math.max(0,(p.springCooldown||0)-dt);movePlayer(s,p,{...emptyInput(),...i},dt);
+ for(const h of s.map.hazards||[])if(h.type==='spring'&&p.vy>=0&&!p.springCooldown&&overlap(p,{...h,y:h.y-2,h:h.h+4})){p.vy=-535;p.ground=false;p.springCooldown=.3;}
+}
+function controlPlayer(s,p,i,dt,deaths){
+ const old=p.previous;movePlayer(s,p,i,dt);
  let reviving=false;if(s.zombie&&i.grab)for(const other of s.players)if(other.downed&&Math.hypot(p.x-other.x,p.y-other.y)<43){other.reviveWork+=dt;reviving=true;}
  if(i.grab&&!old.grab&&!reviving)grab(s,p);
  const weapon=WEAPONS[p.weapon];
@@ -172,7 +181,7 @@ function projectiles(s,dt,deaths){
   g.fuse-=dt;g.vy+=700*dt;g.x+=g.vx*dt;if(g.x<0||g.x>s.map.width-g.w){g.x=clamp(g.x,0,s.map.width-g.w);g.vx*=-.65;}
   const bottom=g.y+g.h;g.y+=g.vy*dt;
   for(const b of collisionTerrain(s))if(overlap(g,b)){if(g.vy>0&&bottom<=b.y+5){g.y=b.y-g.h;g.vy*=-.5;g.vx*=.7;}else if(!b.oneWay){g.vx*=-.65;g.x+=g.vx*dt;}}
-  if(g.fuse<=0){explode(s,g.x,g.y,g.owner,g.damage||135,g.radius||72,deaths);if(g.cluster)for(let n=0;n<4;n++)fragments.push({x:g.x,y:g.y-5,w:5,h:5,vx:(n-1.5)*105,vy:-210-Math.abs(n-1.5)*40,fuse:.4+n*.13,owner:g.owner,damage:70,radius:46,weapon:'cluster'});}
+  if(g.fuse<=0){explode(s,g.x,g.y,g.owner,g.damage||135,g.radius||72,deaths);if(g.cluster)for(let n=0;n<4;n++)fragments.push({id:s.nextEntity++,x:g.x,y:g.y-5,w:5,h:5,vx:(n-1.5)*105,vy:-210-Math.abs(n-1.5)*40,fuse:.4+n*.13,owner:g.owner,damage:70,radius:46,weapon:'cluster'});}
  }
  s.grenades=s.grenades.filter(g=>g.fuse>0&&g.y<s.map.height+90);s.grenades.push(...fragments);
 }

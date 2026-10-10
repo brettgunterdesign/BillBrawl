@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="en"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#142323"><meta name="description" content="Bill Brawl: a browser arena shooter with six species, 22 weapons, 21 arenas, and endless cooperative zombie waves."><title>Bill Brawl — Small bills. Big trouble.</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%23172823'/%3E%3Cpath d='M13 31h12V15h21v11h13v9H44v17H13z' fill='%23ffcc64'/%3E%3Crect x='38' y='20' width='5' height='5' fill='%23172823'/%3E%3C/svg%3E"><link rel="stylesheet" href="style.css"><link rel="stylesheet" href="lobby.css"><script type="module" src="game.js"></script>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%23172823'/%3E%3Cpath d='M13 31h12V15h21v11h13v9H44v17H13z' fill='%23ffcc64'/%3E%3Crect x='38' y='20' width='5' height='5' fill='%23172823'/%3E%3C/svg%3E"><link rel="stylesheet" href="style.css"><link rel="stylesheet" href="lobby.css"><link rel="stylesheet" href="online.css"><script type="module" src="game.js"></script>
 </head><body>
 <main class="screen" id="screen" aria-label="Bill Brawl">
 <canvas id="game" width="1280" height="720" tabindex="0" aria-label="Bill Brawl arena. Escape pauses."></canvas>
@@ -20,7 +20,7 @@
 <button class="mode-card" data-mode="practice" aria-pressed="false"><canvas width="448" height="252" aria-hidden="true"></canvas><div class="mode-text"><h3>PRACTICE</h3><span class="mode-tag">1 PLAYER + BOT</span></div></button>
 <button class="mode-card" data-mode="zombie" aria-pressed="false"><canvas width="448" height="252" aria-hidden="true"></canvas><div class="mode-text"><h3>SURVIVAL</h3><span class="mode-tag">1–4 PLAYERS · ENDLESS WAVES</span></div></button>
 </div>
-<div class="lobby-action-row"><span id="mode-detail" class="hidden"></span><button id="mode-next" class="arcade-primary">NEXT <span>→</span></button></div>
+<div class="lobby-action-row"><button id="online-open" class="arcade-back hidden">ONLINE ↗</button><span id="mode-detail" class="hidden"></span><button id="mode-next" class="arcade-primary">NEXT <span>→</span></button></div>
 </div>
 <div class="lobby-stage hidden" id="stage-crew" data-stage="crew">
 <div class="lobby-heading crew-heading"><div><span id="crew-mode" class="hidden"></span><h2>PICK YOUR BILL.</h2></div><div class="lobby-options"><div id="players-label"><span>PLAYERS</span><div id="player-choices" class="option-chips" role="group" aria-label="Number of players"></div></div><div id="difficulty-label" class="hidden"><span>DIFFICULTY</span><div id="difficulty-choices" class="option-chips" role="group" aria-label="Bot difficulty"></div></div></div></div>
@@ -36,6 +36,27 @@
 </div>
 <div class="lobby-bottom"><span id="menu-hint"><kbd>← →</kbd> SELECT <kbd>ENTER</kbd> NEXT</span><span id="mode-note" role="status"></span><span id="pad-indicator"><i></i>LOCAL PLAY</span></div>
 </div></div>
+<div class="overlay online-menu hidden" id="online-menu" aria-label="Online brawl">
+<div class="online-shell">
+<div class="online-top"><div class="lobby-brand">BILL<span>BRAWL</span></div><div class="online-top-tools"><button id="online-fullscreen" class="lobby-icon" aria-label="Enter fullscreen">⛶</button><button id="online-back" class="arcade-back">← MAIN MENU</button></div></div>
+<div class="online-content">
+<h2>ONLINE BRAWL.</h2>
+<div class="online-identity"><label>NAME<input id="online-name" maxlength="16" placeholder="Your name" autocomplete="nickname"></label><label>YOUR BILL<select id="online-species" aria-label="Your online species"></select></label></div>
+<div id="online-entry" class="online-entry">
+<div class="online-create-card"><h3>START A ROOM.</h3><button id="online-create" class="arcade-primary">CREATE <span>→</span></button></div>
+<div class="online-join-card"><h3>JOIN YOUR CREW.</h3><label class="sr-only" for="online-code">Six-character room code</label><div class="online-code-entry"><input id="online-code" placeholder="ROOM CODE" maxlength="6" autocapitalize="characters" autocomplete="off" spellcheck="false"><button id="online-join" class="arcade-primary">JOIN <span>→</span></button></div></div>
+<button id="online-rejoin" class="arcade-back hidden">REJOIN LAST ROOM →</button>
+</div>
+<div id="online-room" class="hidden">
+<div class="online-room-top"><div><span class="online-room-label">ROOM CODE</span><button id="online-copy" aria-label="Copy room code"><b id="online-room-code"></b><span aria-hidden="true">⧉</span></button></div><span id="online-caption"></span></div>
+<div id="online-roster" class="online-roster" aria-label="Players in the room"></div>
+<div class="online-arena-row"><canvas id="online-preview" width="640" height="360" aria-label="Selected arena preview"></canvas><label>FIRST ARENA<select id="online-arena" aria-label="Online arena"></select></label><div class="online-room-actions"><button id="online-ready" class="arcade-primary" aria-pressed="false">READY</button><button id="online-start" class="arcade-primary" disabled>BRAWL →</button></div></div>
+</div>
+<p id="online-notice" role="status" aria-live="polite"></p>
+</div>
+<div class="online-bottom"><span>2–4 PLAYERS · FIRST TO 10</span><span>KEYBOARD / CONTROLLER</span></div>
+</div></div>
+<div id="online-connection" class="online-connection hidden" role="status"></div>
 <div class="overlay hidden" id="pause" aria-label="Paused"><div class="pause-content"><h2>PAUSED.</h2><div class="audio-settings"><label>MUSIC <input id="music-volume" type="range" min="0" max="100" value="42" aria-label="Music volume"></label><label>EFFECTS <input id="sfx-volume" type="range" min="0" max="100" value="72" aria-label="Effects volume"></label></div><button class="primary" id="resume">RESUME →</button><div class="pause-links"><button class="secondary" id="pause-controls">CONTROLS</button><button class="secondary" id="quit">MAIN MENU</button></div></div></div>
 <div class="overlay hidden" id="help-panel" aria-label="Controls"><div class="help-content"><div class="help-heading"><h2>CONTROLS.</h2><button id="help-close" class="lobby-icon" aria-label="Close controls">×</button></div><div class="help-tabs" role="group" aria-label="Controls layout"><button data-controls="p1" aria-pressed="true">PLAYER 1</button><button data-controls="p2" aria-pressed="false">PLAYER 2</button><button data-controls="pad" aria-pressed="false">CONTROLLER</button></div><div id="control-list"></div><p>Grab a weapon. Last bill standing wins.<br>Survival: stay together and hold grab to revive.</p><div class="help-actions"><button id="help-fullscreen" class="secondary">⛶ FULLSCREEN</button><button id="help-done" class="primary">GOT IT →</button></div></div></div>
 <div class="overlay hidden" id="upgrade-menu"><div class="upgrade-content"><h2>WAVE CLEARED.</h2><p id="upgrade-countdown"></p><div id="upgrade-players"></div><button id="next-wave" class="primary">NEXT WAVE →</button></div></div>

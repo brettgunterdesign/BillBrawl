@@ -10,7 +10,7 @@ Serve `dist` with any static HTTP server:
 python -m http.server 8080 --directory dist
 ```
 
-Open `http://localhost:8080` in a desktop browser. Two players share a keyboard or use controllers. Three/four-human survival uses keyboard players 1–2 and one/two controllers for players 3–4; four-player PvP uses the same mapping. Solo practice has easy, normal, and hard bot settings. Controls are available through the “?” button inside the game. Mobile rendering is responsive, but touch controls and internet multiplayer are not implemented.
+Open `http://localhost:8080` in a desktop browser. Two players share a keyboard or use controllers. Three/four-human survival uses keyboard players 1–2 and one/two controllers for players 3–4; four-player PvP uses the same mapping. Solo practice has easy, normal, and hard bot settings. Controls are available through the “?” button inside the game. Mobile rendering is responsive, but touch controls are not implemented. Internet Versus is available when a room server is configured; see [Render hosting setup](server/HOSTING.md).
 
 ## Arcade lobby
 
@@ -40,9 +40,19 @@ Audio begins with a play or sound-button gesture, as required by browser autopla
 Buildless JavaScript modules with a Canvas renderer and a fixed 60 Hz game simulation. Swept bullet collision prevents tunnelling. Combat resolves simultaneous deaths before scoring. The engine is independent of the DOM. Graph navigation routes bots and zombies across platform geometry.
 
 - `npm test`: 45 engine, camera, audio, and terrain regression checks, including expanded-world bounds, varied arena sizes, smooth zooming, player framing, constant practice beat spacing across 84 rounds, and bot combat and zombie pursuit in all 21 arenas, all 22 attacks, wall/piercing collisions, friendly fire, rewards, revival, bleed-out, team wipe, supplies, upgrades, and progression beyond wave 100.
-- `npm run check`: syntax checks for all ten JavaScript modules.
+- `npm run check`: syntax checks for all game and room-server JavaScript modules.
 - `npm run test:browser`: Playwright integration checks using the environment-provided Chromium and Playwright. Tests cover the three lobby screens, independent ready/unlock and species choices, back navigation, virtual controller-only setup, keyboard/mouse input, fullscreen, all player counts at seven viewport widths from 320–1440 pixels, viewport coverage with no surrounding page, controls overlay and pause restoration, movement/pickup/fire, active bots and steady music across 42 practice rounds, co-op upgrades, audio controls, controller disconnect, huge-world previews, camera zooming and framing during play, simultaneous-death rendering, all 21 arena previews, and all 22 weapon sprites and audible effects. Physical controller hardware and subjective soundtrack listening have not been tested.
 
 The read-only `getSnapshot()` module export supports diagnostics. `?qa=1` enables explicit local test hooks for late-wave UI checks; normal play does not enable those hooks. Browser test screenshots are ignored by Git.
 
-The only external page resource is an optional Google Fonts stylesheet; system fonts provide a fallback. Game code, art, and sounds are self-contained and require no runtime services.
+The only external page resource is an optional Google Fonts stylesheet; system fonts provide a fallback. Local game code, art, and sounds are self-contained. Online Versus uses the separate Node/WebSocket room service in `server/`.
+
+## Private online rooms
+
+The fullscreen main menu gains an Online entry when `dist/online-config.js` contains a reachable WSS endpoint. The Node server also serves the game directly and configures its own endpoint automatically. Production query parameters cannot override the configured server.
+
+Online Versus supports 2–4 guests, six-character room codes, host arena choice, per-player species and ready state, first to ten, arena rotation, and rematches. Each browser uses its keyboard or first controller for one assigned character. The server runs the shared engine at 60 Hz; compressed snapshots arrive at 20 Hz. Movement uses local prediction, acknowledged input replay and remote interpolation. The server owns hits, ammo, terrain, deaths and scoring. Opening a menu releases inputs while the match continues. Seats survive disconnects for 30 seconds; a reloaded tab can rejoin via tab-scoped session storage. Leaving or an expired seat releases the player; hosting transfers when the host expires.
+
+Run `npm ci --prefix server` and `npm run start:rooms`, then open `http://localhost:3001`. `npm run test:online` runs six real-WebSocket server integration checks and two prediction checks. `npm run test:online:browser` runs separate browser contexts through a ~120 ms round-trip delay relay and covers rooms, prediction, shared combat/cover/scores, reconnect/reload, rematches, four players, narrow layouts and graceful leave. `npm run check` covers the original modules, client networking and server syntax.
+
+See [server/HOSTING.md](server/HOSTING.md) and `render.yaml` for deployment. Use one always-on service instance initially; rooms live in RAM and end when it restarts. Bot practice and zombie survival remain local in this first online milestone. Actual hosting capacity and cross-region latency have not been measured.

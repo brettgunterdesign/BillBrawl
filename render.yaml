@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: bill-brawl-rooms
+    runtime: node
+    plan: starter
+    numInstances: 1
+    buildCommand: npm ci --prefix server
+    startCommand: node server/index.mjs
+    healthCheckPath: /health
+    autoDeployTrigger: "off"
+    envVars:
+      - key: NODE_VERSION
+        value: 22
+      - key: ALLOWED_ORIGINS
+        value: https://bill-brawl.brettgunter18.chatgpt.site
