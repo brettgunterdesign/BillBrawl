@@ -10,6 +10,7 @@ const THEMES = {
   jungle: { root: 48, bpm: 132, melody: [12, 15, null, 7, 10, null, 12, 17, 15, null, 12, null, 10, 7, 5, null] },
   lava: { root: 43, bpm: 138, melody: [12, null, 13, 12, 7, null, 10, 7, 3, 5, null, 7, 10, null, 13, null] }
 };
+const PRACTICE_BPM = 126;
 const LOBBY = { root: 53, bpm: 104, melody: [12, null, 16, null, 19, 16, null, 14, 12, null, 9, 12, null, 14, 16, null] };
 const ZOMBIE = { root: 38, bpm: 118, melody: [12, null, null, 13, 7, null, 10, null, 12, null, 6, null, 7, 6, null, 3] };
 
@@ -95,7 +96,7 @@ export class AudioDirector {
   }
 
   setScene(scene, theme = this.theme) {
-    if (!['lobby', 'pvp', 'zombie', 'gameover'].includes(scene)) scene = 'lobby';
+    if (!['lobby', 'pvp', 'practice', 'zombie', 'gameover'].includes(scene)) scene = 'lobby';
     const changed = scene !== this.scene || theme !== this.theme;
     this.scene = scene;
     this.theme = theme || 'dock';
@@ -206,13 +207,15 @@ export class AudioDirector {
     if (this.scene === 'lobby' || this.scene === 'gameover') return LOBBY;
     if (this.scene === 'zombie') return { ...ZOMBIE, bpm: ZOMBIE.bpm + Math.min(34, (this.wave - 1) * 2) };
     const theme = String(this.theme).toLowerCase();
-    if (/roof|sky/.test(theme)) return THEMES.roof;
-    if (/pump|sewer|factory/.test(theme)) return THEMES.pump;
-    if (/neon|city|arcade/.test(theme)) return THEMES.neon;
-    if (/ice|snow|frost/.test(theme)) return THEMES.ice;
-    if (/jungle|forest|garden/.test(theme)) return THEMES.jungle;
-    if (/lava|volcano|forge/.test(theme)) return THEMES.lava;
-    return THEMES.dock;
+    const track = /roof|sky/.test(theme) ? THEMES.roof
+      : /pump|sewer|factory/.test(theme) ? THEMES.pump
+      : /neon|city|arcade/.test(theme) ? THEMES.neon
+      : /ice|snow|frost/.test(theme) ? THEMES.ice
+      : /jungle|forest|garden/.test(theme) ? THEMES.jungle
+      : /lava|volcano|forge/.test(theme) ? THEMES.lava
+      : THEMES.dock;
+    // Practice rotates arenas each round, but its music keeps one steady tempo.
+    return this.scene === 'practice' ? { ...track, bpm: PRACTICE_BPM } : track;
   }
 
   _schedule() {

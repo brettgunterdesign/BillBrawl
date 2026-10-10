@@ -10,7 +10,7 @@ const roster=['platypus','duck','toucan','pelican'];
 const binds=[{left:'KeyA',right:'KeyD',jump:'KeyW',down:'KeyS',fire:'KeyF',grab:'KeyG',chirp:'KeyQ',strafe:'ShiftLeft'},{left:'ArrowLeft',right:'ArrowRight',jump:'ArrowUp',down:'ArrowDown',fire:'KeyK',grab:'KeyL',chirp:'KeyO',strafe:'Enter'}];
 const used=new Set([...Object.values(binds[0]),...Object.values(binds[1]),'Escape','Space']);
 const theme=()=>({snow:'ice',ruins:'jungle',foundry:'lava'}[state.map.theme]||state.map.theme);
-function scene(){audio.setScene(!started?'lobby':state.phase==='game-over'||state.phase==='match-over'?'gameover':state.zombie?'zombie':'pvp',theme());}
+function scene(){audio.setScene(!started?'lobby':state.phase==='game-over'||state.phase==='match-over'?'gameover':state.zombie?'zombie':mode==='practice'?'practice':'pvp',theme());}
 function art(target,paint,w,h){target.width=w*2;target.height=h*2;const c=target.getContext('2d');c.scale(2,2);c.imageSmoothingEnabled=false;paint(c);}
 const lobbyMenu=new ArcadeLobby({audio,roster,onPreview:options=>{mode=options.mode;if(!started){state=createState(mode,options);hudKey='';scene();}},onStart:startMatch,onFullscreen:()=> $('fullscreen').click()});
 function collections(){
