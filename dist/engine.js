@@ -2,6 +2,13 @@ import {MAPS,WEAPONS,mapForMode} from './content.js';
 import {collisionTerrain,toggleDoor,breakTerrain,blastTerrain,addField,updateTerrain,footing} from './terrain.js';
 export {MAPS,WEAPONS};
 export const WIDTH=640,HEIGHT=360,COLORS=['#ffcc64','#8eb6e6','#e98b89','#99c998'];
+export const BOT_DIFFICULTIES=Object.freeze({
+ beginner:Object.freeze({reaction:1.2,burst:.04,pause:1.6,aimSpread:.18,alignment:10,retreat:0,dodge:0,description:'Plenty of reaction time, imperfect aim, no dodging.'}),
+ easy:Object.freeze({reaction:.8,burst:.08,pause:1,aimSpread:.08,alignment:12,retreat:0,dodge:0,description:'Slower reactions, short bursts, no dodging.'}),
+ normal:Object.freeze({reaction:.35,burst:.3,pause:.45,aimSpread:.02,alignment:16,retreat:.35,dodge:1.2,description:'Balanced reactions and occasional dodging.'}),
+ hard:Object.freeze({reaction:.1,burst:1.2,pause:.08,aimSpread:0,alignment:20,retreat:.55,dodge:.35,description:'Quick reactions, accurate aim, frequent dodging.'})
+});
+export const DEFAULT_BOT_DIFFICULTY='easy';
 export const overlap=(a,b)=>a.x<b.x+b.w&&a.x+a.w>b.x&&a.y<b.y+b.h&&a.y+a.h>b.y;
 const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
 export function segmentRect(x1,y1,x2,y2,r){let lo=0,hi=1;for(const [p,d,min,max] of [[x1,x2-x1,r.x,r.x+r.w],[y1,y2-y1,r.y,r.y+r.h]]){if(Math.abs(d)<1e-9){if(p<min||p>max)return null;}else{let a=(min-p)/d,b=(max-p)/d;if(a>b)[a,b]=[b,a];lo=Math.max(lo,a);hi=Math.min(hi,b);if(lo>hi)return null;}}return lo;}
@@ -10,7 +17,7 @@ const emit=(s,type,data={})=>s.events.push({type,...data});
 export function createState(mode='duel',options={}){
  const zombie=mode==='zombie',count=zombie?clamp(options.players||1,1,4):mode==='party'?4:2;
  const start=Number.isInteger(options.arena)&&options.arena>=0&&options.arena<MAPS.length?options.arena:0;
- const s={mode,zombie,count,difficulty:options.difficulty||'normal',scores:Array(count).fill(0),round:0,mapIndex:start-1,startArena:start,phase:'countdown',timer:0,time:0,roundTime:0,players:[],items:[],bullets:[],grenades:[],particles:[],events:[],winner:null,shake:0,tide:352,wave:0,enemies:[],remaining:0,spawnClock:0,nextEntity:100,teamKills:0,upgradeLevels:Array.from({length:count},()=>({health:0,damage:0,speed:0})),navigation:null};
+ const s={mode,zombie,count,difficulty:Object.hasOwn(BOT_DIFFICULTIES,options.difficulty)?options.difficulty:DEFAULT_BOT_DIFFICULTY,scores:Array(count).fill(0),round:0,mapIndex:start-1,startArena:start,phase:'countdown',timer:0,time:0,roundTime:0,players:[],items:[],bullets:[],grenades:[],particles:[],events:[],winner:null,shake:0,tide:352,wave:0,enemies:[],remaining:0,spawnClock:0,nextEntity:100,teamKills:0,upgradeLevels:Array.from({length:count},()=>({health:0,damage:0,speed:0})),navigation:null};
  startRound(s);return s;
 }
 function makePlayer(s,id,x,y){const level=s.upgradeLevels[id];return{id,x,y,w:16,h:22,vx:0,vy:0,dir:id%2?-1:1,alive:true,downed:false,bleed:0,revive:0,hp:100+level.health*25,maxHp:100+level.health*25,damageScale:1+level.damage*.15,speedScale:1+level.speed*.05,invulnerable:0,ground:false,coyote:0,buffer:0,cooldown:0,weapon:s.zombie?'pistol':null,ammo:s.zombie?WEAPONS.pistol.ammo:0,previous:emptyInput(),chirp:0,flash:0,botTime:0,brain:{jumpHeld:0,jumpRest:0,lastX:x,stuck:0,shootAt:0},points:0,kills:0};}
@@ -29,7 +36,8 @@ function grab(s,p){if(toggleDoor(s,p))return;if(p.weapon){dropWeapon(s,p,true);e
 function spawnShot(s,p,weapon,extra={}){
  const def=WEAPONS[weapon],count=def.pellets||1;
  for(let n=0;n<count;n++){
-  const spread=count===1?0:(n/(count-1)*2-1)*def.spread;
+  const aimSpread=s.mode==='practice'&&p.id===1?BOT_DIFFICULTIES[s.difficulty].aimSpread:0;
+  const spread=(count===1?0:(n/(count-1)*2-1)*def.spread)+(Math.random()*2-1)*aimSpread;
   s.bullets.push({id:s.nextEntity++,x:p.x+8+p.dir*6,y:p.y+9,vx:p.dir*def.speed,vy:(def.launchY||0)+spread*def.speed,
    owner:p.id,weapon,kind:def.kind==='burst'?'bullet':def.kind,damage:def.damage*p.damageScale,life:def.life||1.4,age:0,
    bounces:def.bounces||0,hitIds:[],color:def.color,gravity:def.gravity||0,remaining:def.range||1000,radius:def.radius,...extra});
@@ -82,18 +90,35 @@ export function navigate(s,p,goal,dt){
  if(drop&&p.ground&&!p.previous.jump){i.down=true;i.jump=true;brain.jumpHeld=0;}
  return i;
 }
+// Aim acquisition, sustained weapons, and breaking cover share the same attack budget.
+function botTrigger(s,p,key,profile,weapon,ready){
+ const brain=p.brain;
+ if(brain.aimKey!==key){brain.aimKey=key;brain.aimAt=s.time+profile.reaction;brain.burstUntil=0;}
+ if(!key||!ready||s.time<brain.aimAt||p.cooldown>0&&weapon.charge)return false;
+ if(s.time>=(brain.burstUntil||0)){
+  if(s.time<(brain.nextBurstAt||0))return false;
+  brain.burstUntil=s.time+(weapon.spinup||weapon.charge||0)+profile.burst;
+  brain.nextBurstAt=brain.burstUntil+profile.pause;
+ }
+ if(weapon.charge&&(p.charge||0)>=1){brain.burstUntil=s.time;return false;}
+ return true;
+}
 export function botInput(s,p,dt){
  const target=s.players.find(o=>o.alive&&o.id!==p.id);if(!target)return emptyInput();let goal=target;
  if(!p.weapon||p.ammo===0){let best=Infinity;for(const item of s.items)if(WEAPONS[item.type]&&item.ammo!==0){const from=platformUnder(s,p),to=platformUnder(s,item),route=path(s,from,to);if(from&&to&&from.id!==to.id&&!route.length)continue;const cost=Math.hypot(item.x-p.x,item.y-p.y)+route.length*35;if(cost<best){goal=item;best=cost;}}}
- const i=navigate(s,p,goal,dt),dx=target.x-p.x,dist=Math.abs(dx),aligned=Math.abs(target.y-p.y)<(s.difficulty==='hard'?20:16);
+ const profile=BOT_DIFFICULTIES[s.difficulty]||BOT_DIFFICULTIES[DEFAULT_BOT_DIFFICULTY];
+ const i=navigate(s,p,goal,dt),dx=target.x-p.x,dist=Math.abs(dx),aligned=Math.abs(target.y-p.y)<profile.alignment;let aimKey=null,ready=false,dodging=false;
  if(!p.weapon&&Math.hypot(goal.x-p.x,goal.y-p.y)<36)i.grab=!p.previous.grab;
  if(p.weapon&&p.ammo===0)i.grab=!p.previous.grab;
  if(p.weapon&&p.ammo!==0){p.dir=dx>=0?1:-1;i.strafe=true;const range=WEAPONS[p.weapon].range||480;
-  if(aligned&&visible(s,p,target)){if(dist<range*.55&&p.weapon!=='melee'){i.left=dx>0;i.right=dx<0;}else if(dist<range*.85){i.left=false;i.right=false;}const delay=s.difficulty==='easy'?.42:s.difficulty==='hard'?.04:.16;if(dist<range&&(WEAPONS[p.weapon].spinup||WEAPONS[p.weapon].charge||s.time>=p.brain.shootAt)){i.fire=WEAPONS[p.weapon].charge?p.charge<1:true;p.brain.shootAt=s.time+delay;}}
-  if(s.difficulty!=='easy'&&p.ground&&s.bullets.some(b=>b.owner!==p.id&&Math.abs(b.y-p.y-10)<20&&Math.abs(b.x-p.x)<100&&b.vx*(p.x-b.x)>0)&&!p.previous.jump){i.jump=true;p.brain.jumpHeld=.35;}
+  if(dist<range&&visible(s,p,target)){aimKey=`player:${target.id}:${p.weapon}`;ready=aligned;if(aligned){if(dist<range*profile.retreat&&p.weapon!=='melee'){i.left=dx>0;i.right=dx<0;}else if(dist<range*.85){i.left=false;i.right=false;}}}
+  if(profile.dodge&&s.time>=(p.brain.dodgeAt||0)&&p.ground&&s.bullets.some(b=>b.owner!==p.id&&Math.abs(b.y-p.y-10)<20&&Math.abs(b.x-p.x)<(s.difficulty==='hard'?100:60)&&b.vx*(p.x-b.x)>0)&&!p.previous.jump){i.jump=true;dodging=true;p.brain.jumpHeld=.35;p.brain.dodgeAt=s.time+profile.dodge;}
  }
  if((s.map.objects||[]).some(o=>o.type==='door'&&!o.open&&!o.destroyed&&Math.hypot(o.x+o.w/2-p.x-8,o.y+o.h/2-p.y-p.h/2)<40))i.grab=!p.previous.grab;
- if(p.weapon&&collisionTerrain(s).some(o=>Number.isFinite(o.hp)&&!o.oneWay&&segmentRect(p.x+8,p.y+10,p.x+8+p.dir*65,p.y+10,o)!==null))i.fire=true;
+ if(p.weapon&&p.ammo!==0&&collisionTerrain(s).some(o=>Number.isFinite(o.hp)&&!o.oneWay&&segmentRect(p.x+8,p.y+10,p.x+8+p.dir*65,p.y+10,o)!==null)){aimKey=`cover:${p.weapon}`;ready=true;}
+ // Waiting to aim is intentional; don't treat it as a stuck navigation route.
+ if(aimKey&&ready&&!dodging&&p.ground&&(aimKey.startsWith('cover:')||!i.left&&!i.right)){i.jump=false;p.brain.stuck=0;p.brain.jumpHeld=0;}
+ i.fire=botTrigger(s,p,aimKey,profile,WEAPONS[p.weapon]||{},ready);
  return i;
 }
 const waveCount=s=>Math.min(80,5+s.wave*3)+(s.count-1)*4;

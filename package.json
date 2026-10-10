@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node tests/engine.test.mjs && node tests/camera.test.mjs && node tests/audio.test.mjs && node tests/content.test.mjs",
+    "test": "node tests/engine.test.mjs && node tests/bot.test.mjs && node tests/camera.test.mjs && node tests/audio.test.mjs && node tests/content.test.mjs",
     "check": "node --check dist/content.js && node --check dist/engine.js && node --check dist/audio.js && node --check dist/sprites.js && node --check dist/world.js && node --check dist/game.js && node --check dist/lobby.js && node --check dist/camera.js && node --check dist/terrain.js && node --check dist/terrain-art.js && node --check dist/online.js && node --check dist/online-config.js && node --check server/index.mjs",
     "test:browser": "node tests/browser.mjs",
     "test:online": "node server/test.mjs && node tests/prediction.test.mjs",

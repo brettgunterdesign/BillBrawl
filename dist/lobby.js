@@ -1,4 +1,4 @@
-import {MAPS,COLORS} from './engine.js';
+import {MAPS,COLORS,BOT_DIFFICULTIES,DEFAULT_BOT_DIFFICULTY} from './engine.js';
 import {SPECIES,drawCharacter,drawWeaponIcon} from './sprites.js';
 import {drawBackground,drawArena,drawWater,drawMapPreview} from './world.js';
 const $=id=>document.getElementById(id);
@@ -8,7 +8,7 @@ const ARENA_DESCRIPTIONS=['Harbour cranes, stacked platforms, and a tide with ot
 const wrap=(n,max)=>(n+max)%max;
 export class ArcadeLobby{
  constructor({audio,roster,onPreview,onStart,onFullscreen}){
-  this.audio=audio;this.roster=roster;this.onPreview=onPreview;this.onStart=onStart;this.mode='duel';this.count=2;this.difficulty='normal';this.arena=0;this.stage='mode';this.active=0;this.ready=Array(4).fill(false);this.padPrevious=new Map();this.devices=0;this.chirpUntil=Array(4).fill(0);this.time=0;this.reducedMotion=matchMedia('(prefers-reduced-motion: reduce)').matches;
+  this.audio=audio;this.roster=roster;this.onPreview=onPreview;this.onStart=onStart;this.mode='duel';this.count=2;this.difficulty=DEFAULT_BOT_DIFFICULTY;this.arena=0;this.stage='mode';this.active=0;this.ready=Array(4).fill(false);this.padPrevious=new Map();this.devices=0;this.chirpUntil=Array(4).fill(0);this.time=0;this.reducedMotion=matchMedia('(prefers-reduced-motion: reduce)').matches;
   document.querySelectorAll('[data-mode]').forEach(b=>b.onclick=()=>this.chooseMode(b.dataset.mode));
   $('mode-next').onclick=()=>this.show('crew');$('crew-back').onclick=()=>this.show('mode');$('arena-back').onclick=()=>this.show('crew');$('crew-next').onclick=()=>{if(this.allReady())this.show('arena');};
   $('arena-prev').onclick=()=>this.chooseArena(this.arena-1);$('arena-next').onclick=()=>this.chooseArena(this.arena+1);$('start').onclick=()=>this.launch();$('lobby-fullscreen').onclick=onFullscreen;
@@ -31,15 +31,15 @@ export class ArcadeLobby{
   $('players-label').classList.toggle('hidden',this.mode==='practice');$('difficulty-label').classList.toggle('hidden',this.mode!=='practice');
   $('player-choices').innerHTML=(this.mode==='zombie'?[1,2,3,4]:[2,4]).map(n=>`<button data-count="${n}" class="${n===this.count?'selected':''}" aria-label="${n} players" aria-pressed="${n===this.count}">${n}</button>`).join('');
   $('player-choices').querySelectorAll('button').forEach(b=>b.onclick=()=>this.setCount(Number(b.dataset.count)));
-  $('difficulty-choices').innerHTML=['easy','normal','hard'].map(d=>`<button data-difficulty="${d}" class="${d===this.difficulty?'selected':''}" aria-pressed="${d===this.difficulty}">${d.toUpperCase()}</button>`).join('');
+  $('difficulty-choices').innerHTML=Object.keys(BOT_DIFFICULTIES).map(d=>`<button data-difficulty="${d}" class="${d===this.difficulty?'selected':''}" aria-pressed="${d===this.difficulty}" title="${BOT_DIFFICULTIES[d].description}">${d.toUpperCase()}</button>`).join('');
   $('difficulty-choices').querySelectorAll('button').forEach(b=>b.onclick=()=>this.setDifficulty(b.dataset.difficulty));
  }
  setCount(count){this.count=count;this.ready.fill(false);this.active=Math.min(this.active,count-1);this.configure();this.crewUI();this.sync();this.preview();this.cue();}
- setDifficulty(difficulty){this.difficulty=difficulty;this.configure();this.crewUI();this.sync();this.cue();}
- cycleSetup(delta){if(this.mode==='practice'){const choices=['easy','normal','hard'];this.setDifficulty(choices[wrap(choices.indexOf(this.difficulty)+delta,3)]);}else {const choices=this.mode==='zombie'?[1,2,3,4]:[2,4];this.setCount(choices[wrap(choices.indexOf(this.count)+delta,choices.length)]);}}
+ setDifficulty(difficulty){if(!Object.hasOwn(BOT_DIFFICULTIES,difficulty))return;this.difficulty=difficulty;this.configure();this.crewUI();this.sync();this.preview();this.cue();}
+ cycleSetup(delta){if(this.mode==='practice'){const choices=Object.keys(BOT_DIFFICULTIES);this.setDifficulty(choices[wrap(choices.indexOf(this.difficulty)+delta,choices.length)]);}else {const choices=this.mode==='zombie'?[1,2,3,4]:[2,4];this.setCount(choices[wrap(choices.indexOf(this.count)+delta,choices.length)]);}}
  crewUI(){
   const count=this.mode==='practice'?2:this.count;$('roster').style.setProperty('--crew-count',count);$('roster').dataset.count=String(count);
-  $('roster').innerHTML=Array.from({length:count},(_,id)=>{const bot=this.mode==='practice'&&id===1;return `<article class="crew-slot${bot?' bot':''}" data-slot="${id}" style="--player-color:${COLORS[id]}"><div class="slot-header"><button class="slot-player" data-active="${id}"${bot?' disabled':''}>${bot?'RIVAL BOT':'PLAYER '+String(id+1).padStart(2,'0')}</button><span class="slot-device">${bot?'AI · '+this.difficulty.toUpperCase():this.deviceName(id)}</span></div><canvas class="crew-portrait" width="400" height="280" aria-label="${this.roster[id]} preview"></canvas><div class="crew-species"><button class="species-arrow" data-cycle="-1" aria-label="Previous species for player ${id+1}"${bot?' disabled':''}>‹</button><h3>${this.roster[id]}</h3><button class="species-arrow" data-cycle="1" aria-label="Next species for player ${id+1}"${bot?' disabled':''}>›</button></div><button class="ready-button" data-ready="${id}" aria-pressed="false"${bot?' disabled':''}>${bot?'AI OPPONENT':'READY'}</button></article>`;}).join('');
+  $('roster').innerHTML=Array.from({length:count},(_,id)=>{const bot=this.mode==='practice'&&id===1;return `<article class="crew-slot${bot?' bot':''}" data-slot="${id}" style="--player-color:${COLORS[id]}"><div class="slot-header"><button class="slot-player" data-active="${id}"${bot?' disabled':''}>${bot?'RIVAL BOT':'PLAYER '+String(id+1).padStart(2,'0')}</button><span class="slot-device">${bot?'AI · '+this.difficulty.toUpperCase():this.deviceName(id)}</span></div><canvas class="crew-portrait" width="400" height="280" aria-label="${this.roster[id]} preview"></canvas><div class="crew-species"><button class="species-arrow" data-cycle="-1" aria-label="Previous species for player ${id+1}"${bot?' disabled':''}>‹</button><h3>${this.roster[id]}</h3><button class="species-arrow" data-cycle="1" aria-label="Next species for player ${id+1}"${bot?' disabled':''}>›</button></div><button class="ready-button" data-ready="${id}" aria-pressed="false"${bot?' disabled':''}>${bot?this.difficulty.toUpperCase()+' BOT':'READY'}</button></article>`;}).join('');
   $('roster').querySelectorAll('[data-active]').forEach(b=>b.onclick=()=>{this.active=Number(b.dataset.active);this.sync();this.cue();});
   $('roster').querySelectorAll('[data-cycle]').forEach(b=>b.onclick=()=>this.cycleSpecies(Number(b.closest('[data-slot]').dataset.slot),Number(b.dataset.cycle)));
   $('roster').querySelectorAll('[data-ready]').forEach(b=>b.onclick=()=>this.toggleReady(Number(b.dataset.ready)));

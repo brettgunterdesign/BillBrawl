@@ -25,6 +25,16 @@ try{
  let s=await snapshot();assert.equal(s.phase,'playing');assert.equal(await page.locator('#game-hud').isVisible(),true);assert.equal(s.audio.state,'running');assert.ok(s.audio.voices>0&&s.audio.voices<=64);
  const x=s.players[0].x;await page.keyboard.down('KeyD');await page.waitForTimeout(300);await page.keyboard.up('KeyD');assert.ok((await snapshot()).players[0].x>x+10);await page.keyboard.down('KeyW');await page.waitForTimeout(200);await page.keyboard.press('KeyG',{delay:60});await page.keyboard.up('KeyW');const equipped=(await snapshot()).players[0];assert.ok(equipped.weapon);await page.keyboard.press('KeyF',{delay:60});assert.equal((await snapshot()).players[0].ammo,equipped.ammo-1);
  await page.locator('#help').click();assert.equal((await snapshot()).paused,true);await page.locator('#help-done').click();assert.equal((await snapshot()).paused,false);await page.keyboard.press('Escape');assert.equal((await snapshot()).paused,true);await page.locator('#pause-controls').click();await page.locator('#help-close').click();assert.equal((await snapshot()).paused,true);assert.equal((await snapshot()).audio.voices,0);await page.locator('#music-volume').fill('25');await page.locator('#sfx-volume').fill('60');assert.equal((await snapshot()).audio.musicVolume,.25);await page.locator('#resume').click();await page.locator('#sound').click();assert.equal((await snapshot()).audio.enabled,false);await page.locator('#sound').click();await quit();
+ // Four bot settings, gentler default, keyboard cycling, and visible selected level.
+ await page.locator('[data-mode="practice"]').click();await page.locator('#mode-next').click();
+ assert.equal((await snapshot()).lobby.options.difficulty,'easy');
+ assert.equal(await page.locator('[data-difficulty]').count(),4);
+ assert.match(await page.locator('.crew-slot.bot .ready-button').textContent(),/EASY BOT/);
+ await page.locator('#game').focus();await page.keyboard.press('KeyS');
+ assert.equal((await snapshot()).lobby.options.difficulty,'beginner');
+ await page.keyboard.press('KeyS');assert.equal((await snapshot()).lobby.options.difficulty,'hard');
+ await page.locator('[data-difficulty="beginner"]').click();await page.locator('[data-ready="0"]').click();await shot('bot-difficulty-crew');await page.locator('#crew-next').click();await page.locator('#start').click();await page.waitForTimeout(1900);
+ assert.equal(await page.evaluate(()=>window.billBrawlQA.state().difficulty),'beginner');assert.match(await page.locator('#status').textContent(),/BEGINNER BOT/);await quit();
  // Mouse selection and locked character buttons.
  await setup({mode:'practice',difficulty:'hard'});await page.locator('#start').click();await page.waitForTimeout(2100);const botX=(await snapshot()).players[1].x;await page.waitForTimeout(1600);assert.ok(Math.abs((await snapshot()).players[1].x-botX)>10);assert.match(await page.locator('#status').textContent(),/HARD BOT/);
  // Real Web Audio scheduler must keep practice tempo through two full arena rotations.
@@ -52,7 +62,7 @@ try{
  // Narrow layouts: all three stages and four-player crew fit inside the game viewport.
  await page.setViewportSize({width:390,height:844});await shot('arcade-mobile-modes');await page.locator('[data-mode="zombie"]').click();await page.locator('#mode-next').click();await page.locator('button[data-count="4"]').click();await shot('arcade-mobile-crew');
  const contained=async(stage)=>{const result=await page.evaluate(stage=>{const box=document.querySelector('#screen').getBoundingClientRect(),nodes=[...document.querySelectorAll(`#stage-${stage} button,#stage-${stage} h2,#mode-note`)];return {overflow:document.documentElement.scrollWidth>innerWidth,bad:nodes.filter(n=>{const b=n.getBoundingClientRect();return b.width&&b.height&&(b.left<box.left||b.right>box.right+1||b.top<box.top||b.bottom>box.bottom+1);}).map(n=>n.id||n.className)};},stage);assert.equal(result.overflow,false);assert.deepEqual(result.bad,[],JSON.stringify({width:await page.evaluate(()=>innerWidth),stage,result}));};
- await contained('crew');await page.locator('#crew-back').click();await contained('mode');await page.locator('#mode-next').click();await page.locator('button[data-count="1"]').click();await page.locator('[data-ready="0"]').click();await page.locator('#crew-next').click();await page.locator('[data-arena="5"]').click();await shot('arcade-mobile-arena');await contained('arena');await page.locator('#start').click();await page.waitForTimeout(1900);assert.equal((await snapshot()).started,true);
+ await contained('crew');await page.locator('#crew-back').click();await page.locator('[data-mode="practice"]').click();await page.locator('#mode-next').click();await contained('crew');await shot('bot-difficulty-mobile');await page.locator('#crew-back').click();await page.locator('[data-mode="zombie"]').click();await contained('mode');await page.locator('#mode-next').click();await page.locator('button[data-count="1"]').click();await page.locator('[data-ready="0"]').click();await page.locator('#crew-next').click();await page.locator('[data-arena="5"]').click();await shot('arcade-mobile-arena');await contained('arena');await page.locator('#start').click();await page.waitForTimeout(1900);assert.equal((await snapshot()).started,true);
  await quit();
  for(const width of [1440,1024,960,900,768,390,320]){
   await page.setViewportSize({width,height:1000});await page.locator('[data-mode="zombie"]').click();await contained('mode');await page.locator('#mode-next').click();
@@ -67,6 +77,14 @@ try{
  await page.evaluate(()=>{const s=window.billBrawlQA.state();s.map.hazards=[];s.map.objects=[];s.map.platforms=[{x:0,y:860,w:1600,h:40,oneWay:false}];for(let id=0;id<2;id++)Object.assign(s.players[id],{x:590+id*100,y:838,vx:0,vy:0,ground:true});});await page.waitForTimeout(2300);let close=(await snapshot()).camera.width;assert.ok(close<wide/3);await shot('camera-close');
  await page.keyboard.down('KeyA');await page.keyboard.down('ArrowRight');await page.waitForTimeout(1200);await page.keyboard.up('KeyA');await page.keyboard.up('ArrowRight');s=await snapshot();assert.ok(s.camera.width>close+150);for(const p of s.players){assert.ok(p.x>=s.camera.x+20);assert.ok(p.x+p.w<=s.camera.x+s.camera.width-20);assert.ok(p.y>=s.camera.y+20);assert.ok(p.y+p.h<=s.camera.y+s.camera.height-20);}await shot('camera-separated');
  await page.evaluate(()=>{for(const p of window.billBrawlQA.state().players){p.alive=false;p.downed=false;}});await page.waitForTimeout(100);assert.equal((await snapshot()).phase,'round-over');
+ // Bot difficulty choices remain visible on compact portrait and landscape screens.
+ await quit();
+ for(const [width,height] of [[320,568],[390,844],[852,393],[1024,768]]){
+  await page.setViewportSize({width,height});await page.locator('[data-mode="practice"]').click();await page.locator('#mode-next').click();await contained('crew');
+  for(const difficulty of ['beginner','easy','normal','hard']){await page.locator(`[data-difficulty="${difficulty}"]`).click();assert.equal((await snapshot()).lobby.options.difficulty,difficulty);assert.equal(await page.locator(`button[data-difficulty="${difficulty}"]`).getAttribute('aria-pressed'),'true');await contained('crew');}
+  await page.locator('#crew-back').click();
+ }
+ await page.setViewportSize({width:1440,height:1160});await setup({mode:'duel',players:2});await page.locator('#start').click();
  // Every arena is reachable through the compact paged picker, including the final page.
  await quit();await setup({mode:'zombie',players:1,arena:0});
  await page.locator('[data-arena-page]').click();assert.equal((await snapshot()).lobby.options.arena,7);await shot('polish-treetops');
