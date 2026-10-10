@@ -1,0 +1,1 @@
+{"name":"bill-brawl","private":true,"type":"module","scripts":{"test":"node tests/engine.test.mjs","check":"node --check dist/engine.js && node --check dist/game.js"}}
