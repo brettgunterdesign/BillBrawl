@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createState,update,segmentRect} from '../dist/engine.js';
-function combat(){const s=createState();s.phase='playing';s.map={...s.map,platforms:[]};s.items=[];s.players.forEach((p,id)=>{p.x=100+id*100;p.y=100;p.vx=0;p.vy=0;});return s;}
+function combat(){const s=createState();s.phase='playing';s.map={...s.map,platforms:[],objects:[],hazards:[]};s.items=[];s.players.forEach((p,id)=>{p.x=100+id*100;p.y=100;p.vx=0;p.vy=0;});return s;}
 test('swept collision catches a thin target crossed in one frame',()=>{assert.equal(segmentRect(0,10,100,10,{x:49,y:0,w:2,h:20}),.49);assert.equal(segmentRect(0,30,100,30,{x:49,y:0,w:2,h:20}),null);});
 test('a fast bullet hits a player without tunnelling',()=>{const s=combat();s.bullets=[{x:130,y:110,vx:9000,vy:0,owner:0,life:1,age:0}];update(s,[]);assert.equal(s.players[1].alive,false);assert.equal(s.scores[0],1);});
 test('a wall blocks a fast bullet before the player',()=>{const s=combat();s.map.platforms=[{x:170,y:80,w:3,h:80,oneWay:false}];s.bullets=[{x:130,y:110,vx:9000,vy:0,owner:0,life:1,age:0}];update(s,[]);assert.equal(s.players[1].alive,true);assert.equal(s.bullets.length,0);});
@@ -13,11 +13,22 @@ test('the tenth win completes the match without resetting',()=>{const s=combat()
 test('fixed updates settle both players on the arena',()=>{const s=createState();s.phase='playing';for(let n=0;n<120;n++)update(s,[]);assert.ok(s.players.every(p=>p.ground&&p.alive));assert.equal(s.players[0].y,298);});
 
 const {MAPS,WEAPONS,beginWave,killPlayer,buyUpgrade,upgradeCost}=await import('../dist/engine.js');
-function survival(players=2){const s=createState('zombie',{players});s.phase='playing';s.remaining=1;s.spawnClock=1000;s.map={...s.map,platforms:[{x:0,y:320,w:640,h:40,oneWay:false}]};s.items=[];s.players.forEach((p,id)=>{p.x=100+id*100;p.y=298;p.ground=true;});return s;}
+function survival(players=2){const s=createState('zombie',{players});s.phase='playing';s.remaining=1;s.spawnClock=1000;s.map={...s.map,platforms:[{x:0,y:320,w:640,h:40,oneWay:false}],objects:[],hazards:[]};s.items=[];s.players.forEach((p,id)=>{p.x=100+id*100;p.y=298;p.ground=true;});return s;}
 const zombie=(id,x,hp=100)=>({id,x,y:298,w:16,h:22,vx:0,vy:0,dir:-1,alive:true,ground:true,hp,maxHp:hp,kind:'shambler',speed:0,attack:100,flash:0,previous:{},brain:{jumpHeld:0,jumpRest:0,lastX:x,stuck:0}});
 const bullet=(owner,x,damage=34,kind='bullet')=>({x,y:309,vx:9000,vy:0,owner,damage,kind,life:1,age:0,hitIds:[]});
 test('practice bot acquires weapons, navigates and fires in every arena',()=>{for(let arena=0;arena<MAPS.length;arena++){const s=createState('practice',{arena});let shots=0,pickups=0,jumps=0,maxDistance=0;for(let n=0;n<1200;n++){update(s,[]);for(const e of s.events){if(e.type==='shot'&&e.id===1)shots++;if(e.type==='pickup'&&e.id===1)pickups++;if(e.type==='jump'&&e.id===1)jumps++;}maxDistance=Math.max(maxDistance,Math.abs(s.players[1].x-s.map.spawn[1][0]));s.events=[];}assert.ok(shots>0&&pickups>0&&jumps>0&&maxDistance>40,MAPS[arena].name+' bot remained inactive');}});
-test('all eleven weapons emit their own projectile or melee attack and consume ammo',()=>{assert.equal(Object.keys(WEAPONS).length,11);for(const [type,w]of Object.entries(WEAPONS)){const s=survival(1),p=s.players[0];p.weapon=type;p.ammo=w.ammo;update(s,[{fire:true}]);assert.ok(s.events.some(e=>e.type==='shot'&&e.weapon===type),type);assert.equal(p.ammo,w.ammo<0?-1:w.ammo-1);if(type==='grenade')assert.equal(s.grenades.length,1);else assert.equal(s.bullets.length,type==='shotgun'?5:1);}});
+test('all 22 weapons can fire, consume their own ammo budget and create attacks',()=>{
+ assert.equal(Object.keys(WEAPONS).length,22);
+ for(const [type,w]of Object.entries(WEAPONS)){
+  const s=survival(1),p=s.players[0];p.weapon=type;p.ammo=w.ammo;
+  if(w.charge){for(let n=0;n<55;n++)update(s,[{fire:true}]);update(s,[{}]);}
+  else if(w.spinup){for(let n=0;n<35;n++)update(s,[{fire:true}]);}
+  else update(s,[{fire:true}]);
+  assert.ok(s.events.some(e=>e.type==='shot'&&e.weapon===type),type);
+  assert.ok(w.ammo<0?p.ammo===-1:p.ammo<w.ammo,type+' ammo');
+  assert.ok(s.bullets.length+s.grenades.length+s.traps.length+s.effects.length>0,type+' attack');
+ }
+});
 test('zombie mode has health and no friendly projectile damage',()=>{const s=survival();s.bullets=[bullet(0,130,200)];update(s,[]);assert.equal(s.players[1].hp,100);assert.equal(s.players[1].alive,true);s.enemies=[zombie(100,200,48)];s.bullets=[bullet(0,130,34)];update(s,[]);assert.equal(s.enemies[0].hp,14);assert.equal(s.teamKills,0);});
 test('enemy kills award the shooter points and update team kills',()=>{const s=survival();s.enemies=[zombie(100,200,30)];s.bullets=[bullet(0,130)];update(s,[]);assert.equal(s.teamKills,1);assert.equal(s.players[0].points,100);assert.equal(s.players[0].kills,1);assert.equal(s.enemies.length,0);});
 test('rail shots pierce multiple zombies while a solid wall stops them',()=>{const s=survival(1);s.enemies=[zombie(100,200,30),zombie(101,240,30)];s.bullets=[bullet(0,130,200,'rail')];update(s,[]);assert.equal(s.teamKills,2);const t=survival(1);t.map.platforms.push({x:170,y:280,w:4,h:40,oneWay:false});t.enemies=[zombie(100,200,30)];t.bullets=[bullet(0,130,200,'rail')];update(t,[]);assert.equal(t.teamKills,0);});

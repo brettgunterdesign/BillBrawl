@@ -9,7 +9,7 @@ test('bot rounds keep the same scheduled beat spacing across arena rotations',()
  audio._tone=()=>{}; // Exercise scheduling and round events without synthesizing sound.
  const notes=[];
  audio._musicStep=(track,step,when,length)=>notes.push({step,when,length,bpm:track.bpm});
- for(let round=0;round<28;round++){
+ for(let round=0;round<84;round++){
   audio.context.currentTime=round*2;
   audio.setScene('practice',themes[round%themes.length]);
   audio.play('round',{wave:0});
@@ -37,4 +37,16 @@ test('fixed practice tempo retains arena melodies and existing mode music',()=>{
  audio.setScene('pvp','roof');assert.equal(audio._track().bpm,136);
  audio.setScene('zombie');audio.play('wave',{wave:8});assert.equal(audio._track().bpm,132);
  audio.setScene('practice','ice');assert.equal(audio._track().bpm,126);
+});
+
+const {WEAPONS}=await import('../dist/content.js');
+test('all 22 weapons synthesize distinct firing signatures',()=>{
+ const a=new AudioDirector();a.context={state:'running',currentTime:1};let calls=[];
+ a._tone=(frequency,duration,options)=>calls.push({frequency,duration,...options});
+ a._noise=(duration,options)=>calls.push({noise:true,duration,...options});
+ const signatures=new Set();
+ for(const weapon of Object.keys(WEAPONS)){
+  calls=[];a.play('shot',{weapon});assert.ok(calls.length>0,weapon);
+  const signature=JSON.stringify(calls);assert.ok(!signatures.has(signature),weapon+' shares another firing signature');signatures.add(signature);
+ }
 });

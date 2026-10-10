@@ -1,3 +1,4 @@
+import {drawMaterial,drawDecorations,drawObjects} from './terrain-art.js';
 const palettes={dock:['#edcfa7','#d4ae87','#789f8b'],roof:['#dda58c','#a68e99','#5e6679'],pump:['#aab4aa','#758e87','#48695f'],ruins:['#d3d9af','#91b487','#456950'],neon:['#1c213a','#30334d','#27324c'],snow:['#dcebee','#a9cddc','#6a8b9e'],foundry:['#3d323d','#60433f','#45373a']};
 const rect=(ctx,x,y,w,h,c)=>{ctx.fillStyle=c;ctx.fillRect(Math.round(x),Math.round(y),w,h);};
 function cloud(ctx,x,y,w,c){rect(ctx,x,y,w,8,c);rect(ctx,x+10,y-5,w-20,6,c);rect(ctx,x+23,y-9,w-46,4,c);}
@@ -27,18 +28,10 @@ export function drawBackground(ctx,map,time=0,zombie=false){
  if(zombie){const width=map.width||640,height=map.height||360,floor=height-40;ctx.fillStyle='#16253335';ctx.fillRect(0,0,width,height);for(const x of [6,width-30]){rect(ctx,x,floor-50,24,50,'#263632');rect(ctx,x+3,floor-46,18,44,'#152723');rect(ctx,x+5,floor-42,14,3,'#95b574');}for(let n=0;n<Math.ceil(width/90);n++)rect(ctx,(n*123+time*8)%(width+90)-70,floor-34+n%3*17,92,3,'#a9caa318');}
 
 }
-export function drawArena(ctx,map){
- const theme=map.theme,metal=['pump','neon','foundry'].includes(theme),stone=theme==='ruins',ice=theme==='snow';
- for(const b of map.platforms){
-  if(!b.oneWay&&b.h<32){const c=metal?'#667976':stone?'#89916a':ice?'#accfd2':'#b48b5a';rect(ctx,b.x,b.y,b.w,b.h,'#304b40');rect(ctx,b.x+1,b.y+1,b.w-2,b.h-2,c);rect(ctx,b.x+3,b.y+3,b.w-6,b.h-6,metal?'#465d59':stone?'#758055':ice?'#85b3c0':'#956b40');rect(ctx,b.x+2,b.y+2,b.w-4,2,ice?'#edf5ed':'#dac49b');for(let n=0;n<3;n++)rect(ctx,b.x+3+n*5,b.y+4+n*5,3,3,metal?'#9caf9b':'#cdb082');continue;}
-  const top=ice?'#e6f2ed':stone?'#b3ba88':metal?'#9da59c':'#d7b27c',side=ice?'#8ab6c1':stone?'#727e56':metal?'#4b6361':'#795c3d';
-  rect(ctx,b.x,b.y+3,b.w,b.h,'#243c3560');rect(ctx,b.x,b.y,b.w,b.h,'#31463d');rect(ctx,b.x,b.y,b.w,3,top);rect(ctx,b.x,b.y+3,b.w,3,ice?'#c4e0e0':stone?'#879660':metal?'#697d72':'#e4c793');rect(ctx,b.x,b.y+6,b.w,b.oneWay?6:9,side);
-  for(let x=b.x+5;x<b.x+b.w;x+=19){rect(ctx,x,b.y+1,1,1,'#445344');rect(ctx,x+6,b.y+7,8,1,metal?'#8e9b8e':ice?'#cee8e2':'#b39566');}
-  if(stone)for(let x=b.x+8;x<b.x+b.w;x+=27)rect(ctx,x,b.y+11,12,2,'#4f774d');
-  if(ice)for(let x=b.x+7;x<b.x+b.w;x+=31){rect(ctx,x,b.y+10,2,9,'#b4d8dc');rect(ctx,x,b.y+18,1,4,'#d6e9e4');}
-  if(b.oneWay){for(const x of [b.x+8,b.x+b.w-13]){rect(ctx,x,b.y+12,5,17,metal?'#496460':stone?'#697b54':'#52705a');rect(ctx,x-2,b.y+27,9,3,metal?'#496460':stone?'#697b54':'#52705a');}}
-  else for(let x=b.x+12;x<b.x+b.w;x+=42){rect(ctx,x,b.y+15,8,40,side);rect(ctx,x+2,b.y+17,2,38,top);}
- }
+export function drawArena(ctx,map,time=0){
+ drawDecorations(ctx,map,time);
+ for(const b of map.platforms)drawMaterial(ctx,b,time);
+ drawObjects(ctx,map,time);
 }
 export function drawWater(ctx,map,tide,time=0){const lava=map.theme==='foundry',width=map.width||640,height=map.height||360;rect(ctx,0,tide,width,Math.max(0,height-tide),lava?'#9e543a':'#477c77');rect(ctx,0,tide,width,2,lava?'#ffb960':'#90c5b3');for(let n=0;n<Math.ceil(width/23);n++)rect(ctx,(n*27+time*12)%(width+20)-15,tide+4+n%3*5,14,1,lava?'#ef8f50':'#76aaa0');}
-export function drawMapPreview(ctx,map,time=0,zombie=false){ctx.save();ctx.scale(640/map.width,360/map.height);drawBackground(ctx,map,time,zombie);drawArena(ctx,map);drawWater(ctx,map,map.height-8,time);ctx.restore();}
+export function drawMapPreview(ctx,map,time=0,zombie=false){ctx.save();ctx.scale(640/map.width,360/map.height);drawBackground(ctx,map,time,zombie);drawArena(ctx,map,time);drawWater(ctx,map,map.height-8,time);ctx.restore();}

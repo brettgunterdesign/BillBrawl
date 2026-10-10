@@ -271,7 +271,7 @@ export class AudioDirector {
     const tone = (f, d, opts = {}) => this._tone(f, d, { pan, ...opts, when: now + (opts.delay || 0) });
     const noise = (d, opts = {}) => this._noise(d, { pan, ...opts, when: now + (opts.delay || 0) });
     const flourish = (notes, spacing = .07, volume = .09) => notes.forEach((n, i) => tone(hz(n), .16, { type: 'pulse', volume, delay: i * spacing }));
-    if (type === 'shot' || Object.hasOwn({ pistol: 1, shotgun: 1, grenade: 1, smg: 1, sniper: 1, rocket: 1, ricochet: 1, flamethrower: 1, railgun: 1, crossbow: 1, melee: 1, wrench: 1, bat: 1 }, type)) {
+    if (type === 'shot' || Object.hasOwn({ pistol: 1, shotgun: 1, grenade: 1, smg: 1, sniper: 1, rocket: 1, ricochet: 1, flamethrower: 1, railgun: 1, crossbow: 1, melee: 1, burst: 1, blunderbuss: 1, minigun: 1, laser: 1, plasma: 1, tesla: 1, freeze: 1, acid: 1, boomerang: 1, mine: 1, cluster: 1, wrench: 1, bat: 1 }, type)) {
       const weapon = type === 'shot' ? data.weapon || 'pistol' : type;
       switch (weapon) {
         case 'pistol': tone(490, .065, { end: 70, volume: .13 }); noise(.06, { cutoff: 3700, volume: .14 }); break;
@@ -285,6 +285,17 @@ export class AudioDirector {
         case 'crossbow': tone(620, .11, { type: 'triangle', end: 115, volume: .15 }); noise(.045, { cutoff: 1100, volume: .095 }); break;
         case 'melee': case 'wrench': case 'bat': noise(.14, { filter: 'bandpass', cutoff: 800, cutoffEnd: 3000, volume: .16 }); tone(90, .06, { type: 'triangle', end: 30, volume: .12 }); break;
         case 'grenade': tone(760, .04, { type: 'triangle', end: 390, volume: .07 }); noise(.07, { delay: .04, cutoff: 950, volume: .08 }); break;
+        case 'burst': tone(650,.05,{type:'pulse',end:150,volume:.11});noise(.035,{filter:'bandpass',cutoff:3200,volume:.14});break;
+        case 'blunderbuss': noise(.34,{cutoff:3900,cutoffEnd:220,volume:.3});tone(95,.3,{type:'triangle',end:23,volume:.25});noise(.1,{delay:.2,cutoff:850,volume:.08});break;
+        case 'minigun': noise(.035,{filter:'highpass',cutoff:2100,volume:.13});tone(210,.03,{type:'sawtooth',end:75,volume:.07});break;
+        case 'laser': tone(2200,.19,{type:'sine',end:240,volume:.13});tone(3300,.1,{type:'triangle',end:660,volume:.055});break;
+        case 'plasma': tone(190,.45,{type:'sawtooth',end:32,filter:'lowpass',cutoff:900,volume:.17});tone(520,.3,{type:'sine',end:95,volume:.12});noise(.21,{cutoff:1200,volume:.1});break;
+        case 'tesla': for(let n=0;n<4;n++){tone(1250+n*330,.045,{type:'square',end:350,delay:n*.035,volume:.055});noise(.035,{filter:'highpass',cutoff:3800,delay:n*.035,volume:.1});}break;
+        case 'freeze': noise(.15,{filter:'highpass',cutoff:5700,volume:.12});tone(1700,.15,{type:'triangle',end:2900,volume:.065});break;
+        case 'acid': tone(180,.16,{type:'sine',end:580,volume:.15});tone(430,.12,{type:'triangle',end:140,delay:.06,volume:.08});noise(.08,{filter:'bandpass',cutoff:600,volume:.07});break;
+        case 'boomerang': tone(460,.28,{type:'sine',end:1350,volume:.09});noise(.18,{filter:'bandpass',cutoff:1500,volume:.045});break;
+        case 'mine': tone(95,.035,{type:'triangle',volume:.12});tone(1200,.065,{type:'sine',delay:.14,volume:.075});break;
+        case 'cluster': tone(105,.2,{type:'triangle',end:32,volume:.2});noise(.19,{cutoff:1600,cutoffEnd:4300,volume:.19});break;
         default: tone(470, .075, { end: 90, volume: .12 }); noise(.08, { cutoff: 2400, volume: .12 });
       }
       return;
@@ -310,6 +321,13 @@ export class AudioDirector {
       case 'go': flourish([67, 79], .045, .1); break;
       case 'win': flourish([60, 64, 67, 72, 67, 76, 79], .075, .1); break;
       case 'gameover': flourish([60, 58, 55, 48], .19, .09); break;
+      case 'door': tone(180,.1,{type:'sawtooth',end:90,filter:'lowpass',cutoff:450,volume:.045});noise(.07,{cutoff:800,volume:.08});break;
+      case 'break': noise(data.material==='glass'?.24:.13,{filter:data.material==='glass'?'highpass':'lowpass',cutoff:data.material==='glass'?5000:1500,volume:.13});break;
+      case 'spring': tone(150,.23,{type:'triangle',end:1100,volume:.095});break;
+      case 'freeze': tone(2100,.18,{type:'triangle',end:1200,volume:.06});noise(.09,{filter:'highpass',cutoff:6500,volume:.07});break;
+      case 'charge': tone(70,.85,{type:'sawtooth',end:620,filter:'lowpass',cutoff:1000,volume:.045});break;
+      case 'spin': noise(.45,{filter:'bandpass',cutoff:400,cutoffEnd:2000,volume:.055});break;
+      case 'catch': flourish([76,83],.04,.05);break;
       case 'ui': tone(660, .055, { type: 'triangle', end: 880, volume: .065 }); break;
     }
   }

@@ -12,8 +12,9 @@ export class ArcadeLobby{
   document.querySelectorAll('[data-mode]').forEach(b=>b.onclick=()=>this.chooseMode(b.dataset.mode));
   $('mode-next').onclick=()=>this.show('crew');$('crew-back').onclick=()=>this.show('mode');$('arena-back').onclick=()=>this.show('crew');$('crew-next').onclick=()=>{if(this.allReady())this.show('arena');};
   $('arena-prev').onclick=()=>this.chooseArena(this.arena-1);$('arena-next').onclick=()=>this.chooseArena(this.arena+1);$('start').onclick=()=>this.launch();$('lobby-fullscreen').onclick=onFullscreen;
-  $('arena-dots').innerHTML=MAPS.map((m,id)=>`<button data-arena="${id}" aria-label="${m.name}" aria-pressed="${id===0}">${String(id+1).padStart(2,'0')}</button>`).join('');
-  $('arena-dots').querySelectorAll('button').forEach(b=>b.onclick=()=>this.chooseArena(Number(b.dataset.arena)));
+  $('arena-dots').innerHTML=MAPS.map((m,id)=>`<button data-arena="${id}" aria-label="${m.name}" aria-pressed="${id===0}">${String(id+1).padStart(2,'0')}</button>`).join('')+'<button data-arena-page aria-label="Next group of seven arenas">1/3</button>';
+  $('arena-dots').querySelectorAll('[data-arena]').forEach(b=>b.onclick=()=>this.chooseArena(Number(b.dataset.arena)));
+  $('arena-dots').querySelector('[data-arena-page]').onclick=()=>this.chooseArena((Math.floor(this.arena/7)+1)%3*7);
   $('species-choices').innerHTML=SPECIES.map(name=>`<button data-species="${name}" aria-label="Choose ${name}" aria-pressed="false"><canvas width="144" height="86" aria-hidden="true"></canvas><small>${name.toUpperCase()}</small></button>`).join('');
   $('species-choices').querySelectorAll('button').forEach(b=>b.onclick=()=>this.chooseSpecies(this.active,b.dataset.species));
   this.configure();this.crewUI();this.arenaUI();this.sync();this.preview();
@@ -61,7 +62,7 @@ export class ArcadeLobby{
  }
  show(stage,{focus=true}={}){this.stage=stage;this.errorUntil=0;document.querySelectorAll('[data-stage]').forEach(n=>n.classList.toggle('hidden',n.dataset.stage!==stage));this.sync();this.cue();if(focus){const h=$('stage-'+stage).querySelector('h2');h.tabIndex=-1;h.focus({preventScroll:true});}}
  reset(caption){this.ready.fill(false);this.active=0;this.crewUI();$('menu-caption').textContent=caption;this.show('mode',{focus:false});}
- arenaUI(){const m=MAPS[this.arena];$('arena-name').textContent=m.name;$('arena-tag').textContent=m.size+' · '+m.width+' × '+m.height+' · '+m.tag;$('arena-description').textContent=ARENA_DESCRIPTIONS[this.arena];$('arena-counter').textContent=`0${this.arena+1} / 07`;$('arena-preview').setAttribute('aria-label',m.name+' preview');$('arena-dots').querySelectorAll('button').forEach(b=>{const selected=Number(b.dataset.arena)===this.arena;b.classList.toggle('selected',selected);b.setAttribute('aria-pressed',String(selected));});}
+ arenaUI(){const m=MAPS[this.arena];$('arena-name').textContent=m.name;$('arena-tag').textContent=m.size+' · '+m.width+' × '+m.height+' · '+m.tag;$('arena-description').textContent=m.description||ARENA_DESCRIPTIONS[this.arena];$('arena-counter').textContent=`${String(this.arena+1).padStart(2,'0')} / ${MAPS.length}`;$('arena-preview').setAttribute('aria-label',m.name+' preview');$('arena-dots').querySelector('[data-arena-page]').textContent=`${Math.floor(this.arena/7)+1}/3`;$('arena-dots').querySelectorAll('[data-arena]').forEach(b=>{b.classList.toggle('hidden',Math.floor(Number(b.dataset.arena)/7)!==Math.floor(this.arena/7));const selected=Number(b.dataset.arena)===this.arena;b.classList.toggle('selected',selected);b.setAttribute('aria-pressed',String(selected));});}
  chooseArena(id){this.arena=wrap(id,MAPS.length);this.arenaUI();this.preview();this.cue();}
  launch(){if(!this.allReady()){this.show('crew');return;}const needed=Math.max(0,this.options().players-2);if(this.devices<needed){this.notice(`Connect ${needed} controller${needed===1?'':'s'} for players 3${needed>1?'–4':''}.`);return;}this.onStart(this.options());}
  confirm(){if(this.stage==='mode')this.show('crew');else if(this.stage==='crew'){if(this.allReady())this.show('arena');else this.toggleReady(this.active,true);}else this.launch();}
