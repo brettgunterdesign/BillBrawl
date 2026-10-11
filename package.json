@@ -9,7 +9,7 @@
     "audit:levels": "node scripts/audit-levels.mjs",
     "test:browser": "node tests/browser.mjs",
     "test:online": "node server/test.mjs && node tests/prediction.test.mjs",
-    "test:online:browser": "node tests/online-browser.mjs",
+    "test:online:browser": "node tests/online-browser.mjs && node tests/online-zombie-browser.mjs",
     "start:rooms": "node server/index.mjs",
     "test:world:browser": "node tests/world-browser.mjs",
     "playtest": "node scripts/playtest/run.mjs",

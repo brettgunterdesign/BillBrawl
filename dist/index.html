@@ -50,11 +50,11 @@
 <div id="online-room" class="hidden">
 <div class="online-room-top"><div><span class="online-room-label">ROOM CODE</span><button id="online-copy" aria-label="Copy room code"><b id="online-room-code"></b><span aria-hidden="true">⧉</span></button></div><span id="online-caption"></span></div>
 <div id="online-roster" class="online-roster" aria-label="Players in the room"></div>
-<div class="online-arena-row"><canvas id="online-preview" width="640" height="360" aria-label="Selected arena preview"></canvas><label>FIRST ARENA<select id="online-arena" aria-label="Online arena"></select></label><div class="online-room-actions"><button id="online-ready" class="arcade-primary" aria-pressed="false">READY</button><button id="online-start" class="arcade-primary" disabled>BRAWL →</button></div></div>
+<div class="online-arena-row"><canvas id="online-preview" width="640" height="360" aria-label="Selected arena preview"></canvas><label>MODE<select id="online-mode" aria-label="Online game mode"><option value="versus">VERSUS</option><option value="zombie" disabled>SURVIVAL</option></select></label><label>FIRST ARENA<select id="online-arena" aria-label="Online arena"></select></label><div class="online-room-actions"><button id="online-ready" class="arcade-primary" aria-pressed="false">READY</button><button id="online-start" class="arcade-primary" disabled>BRAWL →</button></div></div>
 </div>
 <p id="online-notice" role="status" aria-live="polite"></p>
 </div>
-<div class="online-bottom"><span>2–4 PLAYERS · FIRST TO 10</span><span>KEYBOARD / CONTROLLER</span></div>
+<div class="online-bottom"><span id="online-mode-detail">2–4 PLAYERS · FIRST TO 10</span><span>KEYBOARD / CONTROLLER</span></div>
 </div></div>
 <div id="online-connection" class="online-connection hidden" role="status"></div>
 <div class="overlay hidden" id="pause" aria-label="Paused"><div class="pause-content"><h2>PAUSED.</h2><div class="audio-settings"><label>MUSIC <input id="music-volume" type="range" min="0" max="100" value="42" aria-label="Music volume"></label><label>EFFECTS <input id="sfx-volume" type="range" min="0" max="100" value="72" aria-label="Effects volume"></label></div><button class="primary" id="resume">RESUME →</button><div class="pause-links"><button class="secondary" id="pause-controls">CONTROLS</button><button class="secondary" id="quit">MAIN MENU</button></div></div></div>

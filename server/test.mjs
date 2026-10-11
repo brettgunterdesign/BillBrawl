@@ -5,6 +5,7 @@ import {WebSocket} from 'ws';
 import {createRoomServer} from './index.mjs';
 import {killPlayer} from '../dist/engine.js';
 
+const until=async predicate=>{const end=Date.now()+3000;while(!predicate()){if(Date.now()>end)throw Error('Transport did not settle');await flush();}};
 const flush=()=>new Promise(resolve=>setTimeout(resolve,15));
 async function client(port,command){
  const ws=new WebSocket(`ws://127.0.0.1:${port}/ws`,{origin:'http://bill-brawl.test'}),messages=[];
@@ -18,7 +19,7 @@ async function fixture(t,options={}){
  const server=createRoomServer({port:0,host:'127.0.0.1',allowedOrigins:['http://bill-brawl.test'],manualTick:true,...options});const address=await server.listen();t.after(()=>server.close());return {server,port:address.port};
 }
 async function pair(t){const f=await fixture(t),host=await client(f.port,{type:'create',name:'Host',species:'platypus'}),guest=await client(f.port,{type:'join',code:host.joined.code,name:'Guest',species:'toucan'});return {...f,host,guest,room:f.server.rooms.get(host.joined.code)};}
-async function start(f){f.host.send({type:'ready',ready:true});f.guest.send({type:'ready',ready:true});await flush();f.host.send({type:'start'});await f.host.take('state');}
+async function start(f){f.host.messages.splice(0);f.host.send({type:'ready',ready:true});f.guest.send({type:'ready',ready:true});await flush();f.host.send({type:'start'});await f.host.take('state');}
 const steps=(f,count)=>{for(let n=0;n<count;n++)f.server.step();};
 
 test('guest rooms share a ready lobby and the server owns movement, ack and scores',async t=>{
@@ -58,7 +59,7 @@ test('four seats are enforced, three-player matches work, and stale inputs relea
 
 test('input edges are queued and opening a menu immediately releases a held action',async t=>{
  const f=await pair(t);await start(f);steps(f,105);
- for(let seq=1;seq<=8;seq++)f.host.send({type:'input',seq,input:{right:true,jump:seq===3}});await flush();steps(f,3);assert.equal(f.room.members[0].appliedSequence,3);assert.equal(f.room.state.players[0].previous.jump,true);
+ for(let seq=1;seq<=8;seq++)f.host.send({type:'input',seq,input:{right:true,jump:seq===3}});await until(()=>f.room.members[0].queue.length===8);steps(f,3);assert.equal(f.room.members[0].appliedSequence,3);assert.equal(f.room.state.players[0].previous.jump,true);
  f.host.send({type:'release',seq:9});await flush();assert.equal(f.room.members[0].queue.length,0);f.server.step();assert.equal(f.room.state.players[0].previous.right,false);assert.equal(f.room.members[0].appliedSequence,9);
 });
 
@@ -71,5 +72,64 @@ test('wrong origins and forged resume tokens are rejected, rooms disappear after
 
 test('the deployment serves the game and health without exposing source or guest credentials',async t=>{
  const f=await fixture(t),base=`http://127.0.0.1:${f.port}`;const page=await fetch(base);assert.equal(page.status,200);assert.match(await page.text(),/name="bill-brawl-rooms" content="\/ws"/);
- const health=await (await fetch(base+'/health')).json();assert.deepEqual(health,{ok:true,protocol:1,arenas:21,rooms:0});assert.equal((await fetch(base+'/server/index.mjs')).status,404);assert.equal((await fetch(base+'/.openai/hosting.json')).status,404);assert.equal((await fetch(base+'/game.js')).headers.get('Content-Type'),'text/javascript');
+ const health=await (await fetch(base+'/health')).json();assert.deepEqual(health,{ok:true,protocol:1,modes:['versus','zombie'],arenas:21,rooms:0});assert.equal((await fetch(base+'/server/index.mjs')).status,404);assert.equal((await fetch(base+'/.openai/hosting.json')).status,404);assert.equal((await fetch(base+'/game.js')).headers.get('Content-Type'),'text/javascript');
+});
+
+async function survival(f){f.host.send({type:'mode',mode:'zombie'});await f.guest.take('lobby',m=>m.mode==='zombie');await start(f);steps(f,105);}
+function flat(s){s.map.platforms=[{x:0,y:320,w:s.map.width,h:40,oneWay:false}];s.map.objects=[];s.map.hazards=[];s.items=[];s._terrainCache=null;s.remaining=10;s.spawnClock=999;for(const p of s.players)Object.assign(p,{x:120+p.id*25,y:298,vx:0,vy:0,ground:true});}
+
+test('survival mode is host-selected, resets readiness and supports a solo ready room',async t=>{
+ const f=await pair(t);assert.deepEqual(f.host.joined.modes,['versus','zombie']);
+ f.guest.send({type:'mode',mode:'zombie'});assert.equal((await f.guest.take('error')).code,'HOST_ONLY');assert.equal(f.room.mode,'versus');
+ f.host.send({type:'ready',ready:true});await flush();f.host.send({type:'mode',mode:'bogus'});assert.equal((await f.host.take('error')).code,'BAD_MODE');assert.equal(f.room.mode,'versus');
+ await survival(f);assert.equal(f.room.state.zombie,true);assert.equal(f.room.state.count,2);assert.equal(f.room.state.remaining,12);
+ const a=await f.guest.take('state',m=>m.state.zombie);assert.deepEqual(a.state.upgradeLevels,[{health:0,damage:0,speed:0},{health:0,damage:0,speed:0}]);assert.ok(a.state.players.every(p=>p.weapon==='pistol'&&p.hp===100));assert.ok(a.state.players.every(p=>!p.brain));
+ const solo=await client(f.port,{type:'create'});solo.send({type:'mode',mode:'zombie'});await solo.take('lobby',m=>m.mode==='zombie');solo.send({type:'ready',ready:true});await flush();solo.send({type:'start'});assert.equal((await solo.take('state')).state.count,1);
+ f.host.send({type:'mode',mode:'versus'});assert.equal((await f.host.take('error')).code,'IN_MATCH');
+});
+
+test('online teammates do not take friendly fire and holding grab revives through authoritative inputs',async t=>{
+ const f=await pair(t);await survival(f);const s=f.room.state;flat(s);
+ f.host.send({type:'input',seq:1,input:{fire:true}});await flush();steps(f,90);assert.equal(s.players[1].hp,100);assert.ok(s.players[0].ammo<12);
+ killPlayer(s,s.players[1]);Object.assign(s.players[1],{x:145,y:298,vx:0,vy:0});f.host.send({type:'input',seq:2,input:{grab:true}});await flush();steps(f,123);
+ assert.equal(s.players[1].alive,true);assert.equal(s.players[1].downed,false);assert.equal(s.players[1].hp,55);
+ await flush();steps(f,3);await f.guest.take('state',m=>m.state.players[1].hp===55);assert.equal(s.players[0].points,0);
+});
+
+test('upgrades spend only the authenticated player points and host or timer advances the shared wave',async t=>{
+ const f=await pair(t);await survival(f);const s=f.room.state;flat(s);s.phase='wave-break';s.timer=12;for(const p of s.players)p.points=800;
+ f.guest.send({type:'upgrade',playerId:0,upgrade:'health',points:99999});await f.host.take('state',m=>m.state.upgradeLevels[1].health===1);
+ assert.equal(s.players[0].points,800);assert.equal(s.players[1].points,550);assert.equal(s.players[1].maxHp,125);
+ f.guest.send({type:'upgrade',upgrade:'constructor'});assert.equal((await f.guest.take('error')).code,'UPGRADE_DENIED');
+ f.guest.send({type:'upgrade',upgrade:'damage'});await flush();assert.equal(s.players[1].points,200);assert.equal(s.players[1].damageScale,1.15);
+ f.guest.send({type:'upgrade',upgrade:'damage'});assert.equal((await f.guest.take('error')).code,'UPGRADE_DENIED');assert.equal(s.players[1].points,200);
+ f.guest.send({type:'next-wave'});assert.equal((await f.guest.take('error')).code,'HOST_ONLY');assert.equal(s.wave,1);
+ f.host.send({type:'next-wave'});await f.guest.take('state',m=>m.state.wave===2);assert.equal(s.phase,'countdown');assert.equal(s.remaining,15);assert.equal(s.players[1].maxHp,125);
+ f.guest.send({type:'upgrade',upgrade:'speed'});assert.equal((await f.guest.take('error')).code,'NO_UPGRADES');
+ s.phase='wave-break';s.timer=.01;steps(f,1);assert.equal(s.wave,3);assert.equal(s.phase,'countdown');
+});
+
+test('expired survival seats cannot revive or respawn; the remaining player continues and hosts the run',async t=>{
+ const f=await pair(t);await survival(f);flat(f.room.state);const s=f.room.state;
+ s.players[1].points=600;s.players[1].hp=73;
+ f.guest.ws.close();await flush();const resumed=await client(f.port,{type:'resume',code:f.guest.joined.code,token:f.guest.joined.token});const recovered=await resumed.take('state');assert.equal(recovered.state.players[1].hp,73);assert.equal(recovered.state.players[1].points,600);
+ f.host.send({type:'leave'});await flush();steps(f,1);assert.equal(f.room.state,s);assert.equal(f.room.hostToken,f.guest.joined.token);assert.equal(s.players[0].departed,true);assert.equal(s.players[0].downed,false);
+ s.remaining=0;s.enemies=[];steps(f,1);assert.equal(s.phase,'wave-break');assert.equal(s.players[0].points,0);assert.equal(s.players[1].points,750);
+ resumed.send({type:'next-wave'});await resumed.take('state',m=>m.state.wave===2);assert.equal(s.remaining,11);assert.equal(s.players[0].alive,false);assert.equal(s.players[0].downed,false);
+});
+
+test('survival shares enemy snapshots, team wipe results and preserves mode for a fresh rematch',async t=>{
+ const f=await pair(t);await survival(f);flat(f.room.state);const s=f.room.state;s.spawnClock=0;steps(f,3);
+ const a=await f.host.take('state',m=>m.state.enemies.length>0),b=await f.guest.take('state',m=>m.tick===a.tick);assert.deepEqual(a.state.enemies,b.state.enemies);assert.ok(a.state.enemies.every(z=>!z.brain));
+ killPlayer(s,s.players[0]);killPlayer(s,s.players[1]);steps(f,1);assert.equal(s.phase,'game-over');s.teamKills=7;steps(f,250);assert.equal(f.room.state,null);assert.equal(f.room.mode,'zombie');assert.ok(f.room.members.every(m=>!m.ready));
+ await f.host.take('lobby',m=>m.caption.includes('7 team kills'));await start(f);assert.equal(f.room.state.wave,1);assert.equal(f.room.state.teamKills,0);assert.ok(f.room.state.players.every(p=>p.points===0));
+});
+
+test('four-player survival scales waves and resumes a non-contiguous seat without changing its upgrades',async t=>{
+ const f=await pair(t),third=await client(f.port,{type:'join',code:f.host.joined.code}),fourth=await client(f.port,{type:'join',code:f.host.joined.code});
+ f.host.send({type:'mode',mode:'zombie'});await fourth.take('lobby',m=>m.mode==='zombie');for(const c of [f.host,f.guest,third,fourth])c.send({type:'ready',ready:true});await flush();f.host.send({type:'start'});const a=await fourth.take('state');assert.equal(a.you,3);assert.equal(a.state.count,4);assert.equal(a.state.remaining,20);
+ third.send({type:'leave'});await flush();steps(f,1);const s=f.room.state;assert.equal(s.players[2].departed,true);assert.equal(s.players[2].downed,false);assert.equal(f.room.members.length,3);
+ s.phase='wave-break';s.timer=12;s.players[3].points=800;fourth.send({type:'upgrade',upgrade:'speed',playerId:2});await fourth.take('state',m=>m.state.upgradeLevels[3].speed===1);assert.equal(s.players[3].points,550);assert.equal(s.upgradeLevels[2].speed,0);
+ f.host.send({type:'next-wave'});await fourth.take('state',m=>m.state.wave===2);assert.equal(s.remaining,19);assert.equal(s.players[2].alive,false);assert.equal(s.players[3].speedScale,1.05);
+ fourth.ws.close();await flush();const resumed=await client(f.port,{type:'resume',code:f.host.joined.code,token:fourth.joined.token});assert.equal((await resumed.take('state')).you,3);assert.equal(s.players[3].points,550);
 });

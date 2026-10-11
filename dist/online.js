@@ -22,6 +22,7 @@ export class OnlineArcade{
   $('online-species').onchange=()=>{if(this.room)this.send({type:'species',species:$('online-species').value});};
   $('online-ready').onclick=()=>this.send({type:'ready',ready:!this.room?.players.find(p=>p.id===this.slot)?.ready});
   $('online-start').onclick=()=>this.send({type:'start'});$('online-arena').replaceChildren(...MAPS.map((m,id)=>new Option(`${String(id+1).padStart(2,'0')} / ${m.name} · ${m.size}`,String(id))));
+  $('online-mode').onchange=()=>this.send({type:'mode',mode:$('online-mode').value});
   $('online-arena').onchange=()=>this.send({type:'arena',arena:Number($('online-arena').value)});
   $('online-copy').onclick=async()=>{try{await navigator.clipboard.writeText(this.room.code);this.notice('Copied. Share this code with your crew.');}catch{this.notice('Share this code with your crew.');}};
   this.pingTimer=setInterval(()=>{if(this.ws?.readyState===WebSocket.OPEN&&this.token)this.send({type:'ping',sent:performance.now()});},2000);
@@ -41,7 +42,7 @@ export class OnlineArcade{
   ws.onmessage=event=>{let data;try{data=JSON.parse(event.data);}catch{return;}if(ws!==this.ws)return;
    if(data.type==='joined'){
     if(data.protocol!==1){this.fatal('This arcade needs the latest game version.');return;}
-    this.slot=data.you;this.code=data.code;this.token=data.token;this.seq=data.sequence||0;this.pending=[];this.connection='connected';this.disconnectedAt=null;this.saveSeat();this.notice('Ready up when your crew arrives.');
+    this.modes=data.modes||['versus'];this.slot=data.you;this.code=data.code;this.token=data.token;this.seq=data.sequence||0;this.pending=[];this.connection='connected';this.disconnectedAt=null;this.saveSeat();this.notice('Ready up when your crew arrives.');
    }
    if(data.type==='lobby'){this.room=data;if(!data.playing){this.current=null;this.pending=[];this.previous=null;this.authoritative=null;this.lastTick=-1;this.seq=0;$('online-menu').classList.remove('hidden');this.onRoom(data);}this.drawRoom();}
    if(data.type==='state')this.receive(data);
@@ -61,7 +62,7 @@ export class OnlineArcade{
  send(data){if(this.ws?.readyState===WebSocket.OPEN){this.ws.send(JSON.stringify(data));return true;}return false;}
  receive(data){
   if(data.tick<=this.lastTick)return;this.lastTick=data.tick;
-  const next=data.state,events=[...next.events],sameRound=this.current?.round===next.round;
+  const next=data.state,events=[...next.events],sameRound=this.current?.round===next.round&&this.current?.wave===next.wave;
   this.previous=sameRound?this.authoritative:null;this.authoritative=structuredClone(next);this.received=performance.now();this.you=data.you;this.pending=this.pending.filter(p=>p.seq>data.ack);if(!sameRound)this.pending=[];
   next.events=[];next._terrainCache=null;const own=next.players[this.you];for(const command of this.pending)predictPlayer(next,own,command.input);next.events=[];
   this.current=next;this.species=data.roster;$('online-menu').classList.add('hidden');this.onState(next,data.roster,this.you);for(const e of events)this.onEvent(e);this.drawConnection();
@@ -71,13 +72,14 @@ export class OnlineArcade{
  frame(){
   if(!this.current)return null;const t=Math.min(1,(performance.now()-this.received)/50),state={...this.current};
   state.players=this.current.players.map((p,id)=>{const a=this.previous?.players[id];return id===this.you||!a||a.alive!==p.alive? p:{...p,x:lerp(a.x,p.x,t),y:lerp(a.y,p.y,t)};});
-  for(const key of ['bullets','grenades']){const prior=new Map((this.previous?.[key]||[]).map(p=>[p.id,p]));state[key]=this.current[key].map(p=>{const a=prior.get(p.id);return !a?p:{...p,x:lerp(a.x,p.x,t),y:lerp(a.y,p.y,t)};});}return state;
+  for(const key of ['bullets','grenades','enemies']){const prior=new Map((this.previous?.[key]||[]).map(p=>[p.id,p]));state[key]=this.current[key].map(p=>{const a=prior.get(p.id);return !a?p:{...p,x:lerp(a.x,p.x,t),y:lerp(a.y,p.y,t)};});}return state;
  }
  drawConnection(){$('online-connection').textContent=this.connection==='connected'?`${this.code} · YOU P${(this.you??this.slot??0)+1} · ${this.rtt} MS`:this.connection.toUpperCase();}
  drawRoom(){
-  const room=this.room,own=room.players.find(p=>p.id===this.slot),host=own?.host;
+  const room=this.room,own=room.players.find(p=>p.id===this.slot),host=own?.host,zombie=room.mode==='zombie';
+  $('online-mode').value=room.mode||'versus';$('online-mode').disabled=!host;$('online-mode').querySelector('[value="zombie"]').disabled=!(room.modes||this.modes||[]).includes('zombie');$('online-mode-detail').textContent=zombie?'1–4 PLAYERS · ENDLESS WAVES':'2–4 PLAYERS · FIRST TO 10';$('online-start').textContent=zombie?'SURVIVE →':'BRAWL →';
   $('online-entry').classList.add('hidden');$('online-room').classList.remove('hidden');$('online-name').disabled=true;$('online-name').value=own?.name||'';$('online-room-code').textContent=room.code;$('online-arena').value=room.arena;$('online-arena').disabled=!host;$('online-species').value=own?.species||'platypus';
-  $('online-ready').textContent=own?.ready?'✓ READY':'READY';$('online-ready').setAttribute('aria-pressed',String(!!own?.ready));$('online-start').classList.toggle('hidden',!host);$('online-start').disabled=room.players.filter(p=>p.connected).length<2||room.players.some(p=>!p.connected||!p.ready);
+  $('online-ready').textContent=own?.ready?'✓ READY':'READY';$('online-ready').setAttribute('aria-pressed',String(!!own?.ready));$('online-start').classList.toggle('hidden',!host);$('online-start').disabled=room.players.filter(p=>p.connected).length<(zombie?1:2)||room.players.some(p=>!p.connected||!p.ready);
   $('online-caption').textContent=room.caption||`${room.players.length} / 4 JOINED`;
   $('online-roster').replaceChildren(...room.players.map(p=>{
    const card=document.createElement('article');card.className='online-seat';card.style.setProperty('--player-color',COLORS[p.id]);
@@ -89,5 +91,5 @@ export class OnlineArcade{
  leave(){this.explicitLeave=true;clearTimeout(this.retry);clearTimeout(this.connectTimer);this.release();this.send({type:'leave'});this.ws?.close();this.ws=null;this.clearSeat();this.token=null;this.room=null;this.current=null;this.authoritative=null;this.previous=null;this.you=null;this.slot=null;this.code=null;this.lastTick=-1;this.active=false;this.pending=[];this.connection='idle';
   $('online-menu').classList.add('hidden');$('online-connection').classList.add('hidden');$('online-entry').classList.remove('hidden');$('online-room').classList.add('hidden');$('online-name').disabled=false;$('online-create').disabled=$('online-join').disabled=$('online-rejoin').disabled=false;this.onExit();
  }
- snapshot(){return {active:this.active,connection:this.connection,code:this.room?.code||null,you:this.you??null,slot:this.slot??null,players:this.room?.players||[],tick:this.lastTick,pending:this.pending.length,rtt:this.rtt,authoritative:this.authoritative?{round:this.authoritative.round,phase:this.authoritative.phase,scores:this.authoritative.scores,players:this.authoritative.players.map(({id,x,y,alive,weapon,ammo})=>({id,x,y,alive,weapon,ammo})),objects:this.authoritative.map.objects}:null};}
+ snapshot(){return {active:this.active,connection:this.connection,code:this.room?.code||null,you:this.you??null,slot:this.slot??null,players:this.room?.players||[],tick:this.lastTick,pending:this.pending.length,rtt:this.rtt,mode:this.room?.mode||'versus',authoritative:this.authoritative?{round:this.authoritative.round,phase:this.authoritative.phase,wave:this.authoritative.wave,zombie:this.authoritative.zombie,enemies:this.authoritative.enemies.length,remaining:this.authoritative.remaining,teamKills:this.authoritative.teamKills,upgradeLevels:this.authoritative.upgradeLevels,scores:this.authoritative.scores,players:this.authoritative.players.map(({id,x,y,alive,downed,revive,hp,maxHp,points,departed,weapon,ammo})=>({id,x,y,alive,downed,revive,hp,maxHp,points,departed,weapon,ammo})),objects:this.authoritative.map.objects}:null};}
 }
