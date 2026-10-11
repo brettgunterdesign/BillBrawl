@@ -17,6 +17,11 @@ async function player(name){const context=await browser.newContext({viewport:{wi
 async function join(page,code){await page.locator('#online-code').fill(code);await page.locator('#online-join').click();await page.locator('#online-room').waitFor({state:'visible'});}
 async function ready(page){await page.locator('#online-ready').click();await until(async()=>await page.locator('#online-ready').getAttribute('aria-pressed')==='true','Player did not ready');}
 try{
+ // A self-hosted game must use its own room server even with a public endpoint configured.
+ const probeContext=await browser.newContext(),probe=await probeContext.newPage();
+ await probe.goto(base);await probe.locator('#online-open').click();await probe.locator('#online-create').click();await probe.locator('#online-room').waitFor({state:'visible'});
+ const probeCode=await probe.locator('#online-room-code').textContent();assert.ok(server.rooms.has(probeCode),'Self-hosted game used the public room server');
+ await probe.locator('#online-back').click();await until(()=>!server.rooms.has(probeCode),'Probe room was not cleaned up');await probeContext.close();
  const host=await player('River'),guest=await player('Paddle');await host.locator('#online-create').click();await host.locator('#online-room').waitFor({state:'visible'});const code=await host.locator('#online-room-code').textContent();await guest.locator('#online-species').selectOption('toucan');await join(guest,code);
  await until(async()=>await host.locator('.online-seat').count()===2,'Roster not shared');assert.equal(await guest.locator('#online-arena').isDisabled(),true);assert.equal(await guest.locator('#online-start').isVisible(),false);
  await host.locator('#online-arena').selectOption('8');await until(async()=>await guest.locator('#online-arena').inputValue()==='8','Arena choice not shared');await host.locator('#online-arena').selectOption('0');

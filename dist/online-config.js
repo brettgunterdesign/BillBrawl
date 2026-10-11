@@ -1,2 +1,2 @@
-// Set to the deployed room server's WSS /ws endpoint to enable public online play.
-export const ONLINE_ENDPOINT='';
+// Public Render room server; no credentials belong in this browser module.
+export const ONLINE_ENDPOINT='wss://bill-brawl-rooms.onrender.com/ws';

@@ -2,9 +2,19 @@
 
 The browser game and private-room server are implemented. The existing ChatGPT Site serves static files; internet matches need this additional running Node service. Render Web Services support WSS and TLS. Use a paid, always-on service so the room server does not sleep. This repository's `render.yaml` uses Starter and one instance. Review Render's current price before provisioning: https://render.com/pricing.
 
+## Live service
+
+- Room server and standalone game: https://bill-brawl-rooms.onrender.com
+- Health check: https://bill-brawl-rooms.onrender.com/health
+- Public WebSocket endpoint: `wss://bill-brawl-rooms.onrender.com/ws`
+- Existing browser game: https://bill-brawl.brettgunter18.chatgpt.site
+- Source: https://github.com/brettgunterdesign/BillBrawl
+
+The browser endpoint is configured in `dist/online-config.js`. The service allows the existing Site origin and its own origin. Automatic deploys remain disabled; a server restart ends active rooms.
+
 ## Deploy
 
-1. Unpack `bill-brawl-online-source.zip` into a new GitHub repository (private is fine). Commit the included `dist/`, `server/`, root `package.json`, `render.yaml`, and documentation. Do not set the service's root directory to `server`: the engine modules are in `dist`.
+1. Connect the existing `brettgunterdesign/BillBrawl` GitHub repository, which includes `dist/`, `server/`, root `package.json`, `render.yaml`, and documentation. Do not set the service's root directory to `server`: the engine modules are in `dist`.
 2. Sign in to https://dashboard.render.com and connect that repository. Choose **New → Blueprint** and select `render.yaml`. Alternatively choose **New → Web Service**, Node runtime, build command `npm ci --prefix server`, start command `node server/index.mjs`, health check `/health`, and one paid Starter instance.
 3. Choose a region near the players. Set `NODE_VERSION=22` and `ALLOWED_ORIGINS=https://bill-brawl.brettgunter18.chatgpt.site`. Render supplies `PORT`; the server binds `0.0.0.0`. The Blueprint sets these values for you. Deploy manually; automatic deploys are disabled to avoid interrupting games during code pushes.
 4. Open the actual service URL Render returns. `/health` must return `{"ok":true,"protocol":1,"arenas":21,"rooms":0}` (the room count changes during play). The service URL itself also serves Bill Brawl with online play already enabled, using its own `/ws` endpoint. Test Create → share the six-character room code → Join → ready both players → Brawl in separate browsers.
@@ -15,7 +25,7 @@ The browser game and private-room server are implemented. The existing ChatGPT S
 - 2–4 guests in private six-character rooms; no game accounts required.
 - Host arena selection, six cosmetic species, per-player ready state, first to ten, rotating arenas, and rematches in the same room.
 - Authoritative 60 Hz movement/combat/terrain/scoring, 20 Hz compressed snapshots, input sequence acknowledgements, local movement prediction and reconciliation, and interpolation of other players and projectiles.
-- Keyboard or the first controller controls one assigned character per browser. In the online room, controller left/right or bumpers choose species, up/down changes the host’s first arena, south readies, Start launches for the host, and east unreadies or leaves. Name and room-code entry use the keyboard. Opening a menu releases held controls while the room continues.
+- Keyboard or the first controller controls one assigned character per browser. In online menus, controller up/down moves focus; left/right adjusts species and the host’s arena selector; bumpers also cycle species. South confirms or readies, Start launches for the host, and east unreadies or leaves. The controller keyboard supports name and room-code entry. Opening a menu releases held controls while the room continues.
 - Automatic reconnect with a 30-second reserved seat; a tab reload can rejoin using tab-scoped session storage. Leave releases the seat; an expired host transfers hosting. Closed rooms are removed. All room state is in RAM: service restarts end active rooms.
 - This milestone is online Versus. Bot practice and zombie survival remain local. There is no public matchmaking, account system, spectators, rollback hit compensation, or cross-region routing yet.
 

@@ -5,7 +5,7 @@ import {ONLINE_ENDPOINT} from './online-config.js';
 const $=id=>document.getElementById(id),lerp=(a,b,t)=>a+(b-a)*t;
 const endpoint=()=>{
  const local=['localhost','127.0.0.1','[::1]'].includes(location.hostname);
- const value=(local?new URLSearchParams(location.search).get('rooms'):'')||ONLINE_ENDPOINT||document.querySelector('meta[name="bill-brawl-rooms"]')?.content;
+ const value=(local?new URLSearchParams(location.search).get('rooms'):'')||document.querySelector('meta[name="bill-brawl-rooms"]')?.content||ONLINE_ENDPOINT;
  if(!value)return '';try{const url=new URL(value,location.href);if(url.protocol==='https:')url.protocol='wss:';if(local&&url.protocol==='http:')url.protocol='ws:';if(url.protocol==='wss:'||local&&url.protocol==='ws:')return url.href;}catch{}return '';
 };
 const readSeat=()=>{try{return JSON.parse(sessionStorage.getItem('bill-brawl-seat'));}catch{return null;}};

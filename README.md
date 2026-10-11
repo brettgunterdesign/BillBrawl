@@ -10,7 +10,7 @@ Serve `dist` with any static HTTP server:
 python -m http.server 8080 --directory dist
 ```
 
-Open `http://localhost:8080` in a desktop browser. Two players share a keyboard or use controllers. Three/four-human survival uses keyboard players 1–2 and one/two controllers for players 3–4; four-player PvP uses the same mapping. Solo practice has Beginner, Easy (default), Normal, and Hard bot settings. Choose DIFFICULTY on the character selection screen; W/S or controller bumpers cycle the four settings. Controls are available through the “?” button inside the game. Mobile rendering is responsive, but touch controls are not implemented. Internet Versus is available when a room server is configured; see [Render hosting setup](server/HOSTING.md).
+Open `http://localhost:8080` in a desktop browser. Two players share a keyboard or use controllers. Three/four-human survival uses keyboard players 1–2 and one/two controllers for players 3–4; four-player PvP uses the same mapping. Solo practice has Beginner, Easy (default), Normal, and Hard bot settings. Choose DIFFICULTY on the character selection screen; W/S or controller bumpers cycle the four settings. Controls are available through the “?” button inside the game. Mobile rendering is responsive, but touch controls are not implemented. Internet Versus uses the live Render room server at https://bill-brawl-rooms.onrender.com; see [Render hosting setup](server/HOSTING.md).
 
 ## Arcade lobby
 
@@ -52,7 +52,7 @@ The only external page resource is an optional Google Fonts stylesheet; system f
 
 ## Private online rooms
 
-The fullscreen main menu gains an Online entry when `dist/online-config.js` contains a reachable WSS endpoint. The Node server also serves the game directly and configures its own endpoint automatically. Production query parameters cannot override the configured server.
+The fullscreen main menu’s Online entry connects to `wss://bill-brawl-rooms.onrender.com/ws`, configured in `dist/online-config.js`. The Node server also serves the game directly and configures its own endpoint automatically. Production query parameters cannot override the configured server.
 
 Online Versus supports 2–4 guests, six-character room codes, host arena choice, per-player species and ready state, first to ten, arena rotation, and rematches. Each browser uses its keyboard or first controller for one assigned character. The server runs the shared engine at 60 Hz; compressed snapshots arrive at 20 Hz. Movement uses local prediction, acknowledged input replay and remote interpolation. The server owns hits, ammo, terrain, deaths and scoring. Opening a menu releases inputs while the match continues. Seats survive disconnects for 30 seconds; a reloaded tab can rejoin via tab-scoped session storage. Leaving or an expired seat releases the player; hosting transfers when the host expires.
 
